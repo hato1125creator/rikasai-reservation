@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="ja">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>入場確認 - 梨花祭2025</title>
+    <link rel="stylesheet" href="/css/style.css">
+</head>
+
+<body class="landing-page">
+    <div class="glass-card slide-up" style="text-align: center;">
+        <h1 class="title">梨花祭2025</h1>
+        <p class="subtitle">入場確認</p>
+
+        <div id="loading-state">
+            <div id="loading-container">
+                <div class="loader"></div>
+                <p style="margin-top: 1rem; color: var(--color-text-sub); font-size: 0.9rem;">確認中...</p>
+            </div>
+        </div>
+
+        <div id="verify-success" style="display: none;">
+            <div style="width: 80px; height: 80px; border-radius: 50%; background-color: var(--color-success-bg); display: flex; align-items: center; justify-content: center; margin: 0 auto 1.5rem;">
+                <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="var(--color-success)" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
+                    <polyline points="20 6 9 17 4 12"></polyline>
+                </svg>
+            </div>
+            <h2 style="color: var(--color-success); margin-bottom: 1rem; font-size: var(--font-size-lg);">予約が確認されました</h2>
+            <div style="background: var(--color-bg); border-radius: var(--radius-md); padding: 1.5rem; text-align: left; margin-bottom: 1.5rem;">
+                <table style="width: 100%; border-collapse: collapse;">
+                    <tr>
+                        <th style="text-align: left; padding: 0.5rem 0; color: var(--color-text-sub); font-weight: 500; width: 40%;">ゲスト名</th>
+                        <td id="res-name" style="padding: 0.5rem 0; font-weight: 700;"></td>
+                    </tr>
+                    <tr>
+                        <th style="text-align: left; padding: 0.5rem 0; color: var(--color-text-sub); font-weight: 500;">招待者（生徒）</th>
+                        <td id="res-student" style="padding: 0.5rem 0; font-weight: 700;"></td>
+                    </tr>
+                    <tr>
+                        <th style="text-align: left; padding: 0.5rem 0; color: var(--color-text-sub); font-weight: 500;">ステータス</th>
+                        <td id="res-status" style="padding: 0.5rem 0;"></td>
+                    </tr>
+                </table>
+            </div>
+            <p style="color: var(--color-text-sub); font-size: var(--font-size-sm);">当日受付にて、このQRコードをご提示ください。</p>
+        </div>
+
+        <div id="verify-error" style="display: none;">
+            <div style="width: 80px; height: 80px; border-radius: 50%; background-color: var(--color-error-bg); display: flex; align-items: center; justify-content: center; margin: 0 auto 1.5rem;">
+                <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="var(--color-error)" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
+                    <line x1="18" y1="6" x2="6" y2="18"></line>
+                    <line x1="6" y1="6" x2="18" y2="18"></line>
+                </svg>
+            </div>
+            <h2 style="color: var(--color-error); margin-bottom: 1rem; font-size: var(--font-size-lg);">確認できませんでした</h2>
+            <p id="error-detail" style="color: var(--color-text-sub);">招待リンクが無効または使用済みです。</p>
+        </div>
+
+        <div style="margin-top: 2rem;">
+            <p style="font-size: var(--font-size-sm); color: var(--color-text-sub);">
+                開催日時：2025年6月◯日（土）9:00〜14:00<br>
+                千葉英和高等学校
+            </p>
+        </div>
+    </div>
+
+    <script>
+        (async function () {
+            const params = new URLSearchParams(window.location.search);
+            const token = params.get('token');
+            const legacyId = params.get('id');
+
+            const loadingState = document.getElementById('loading-state');
+            const successState = document.getElementById('verify-success');
+            const errorState = document.getElementById('verify-error');
+
+            function showError(msg) {
+                loadingState.style.display = 'none';
+                errorState.style.display = 'block';
+                if (msg) document.getElementById('error-detail').textContent = msg;
+            }
+
+            // 新方式: token
+            if (token) {
+                try {
+                    const response = await fetch(`/api/guest-entry/${encodeURIComponent(token)}`);
+                    const data = await response.json();
+                    loadingState.style.display = 'none';
+
+                    if (response.ok && data.valid) {
+                        successState.style.display = 'block';
+                        document.getElementById('res-name').textContent = data.guest_name || '—';
+                        document.getElementById('res-student').textContent = data.student_name || '—';
+                        document.getElementById('res-status').innerHTML =
+                            `<span style="background: var(--color-success-bg); color: var(--color-success); padding: 4px 12px; border-radius: 50px; font-weight: 700; font-size: 14px;">予約済み</span>`;
+                    } else if (response.status === 410) {
+                        showError('この招待リンクは既に使用済みです。');
+                    } else {
+                        showError(data.message || '招待リンクが無効です。');
+                    }
+                } catch (e) {
+                    showError('サーバーとの通信に失敗しました。');
+                }
+                return;
+            }
+
+            // 旧方式: id（後方互換）
+            if (legacyId) {
+                try {
+                    const response = await fetch(`/api/reservation-status/${encodeURIComponent(legacyId)}`);
+                    const data = await response.json();
+                    loadingState.style.display = 'none';
+
+                    if (response.ok && data.found) {
+                        successState.style.display = 'block';
+                        document.getElementById('res-name').textContent = data.name || '—';
+                        document.getElementById('res-student').textContent = '—';
+                        const statusMap = {
+                            'pending': { text: '予約済み', bg: 'var(--color-success-bg)', color: 'var(--color-success)' },
+                            'checked-in': { text: '入場済み', bg: 'var(--color-warning-bg)', color: '#D65A00' },
+                            'cancelled': { text: 'キャンセル済み', bg: 'var(--color-error-bg)', color: 'var(--color-error)' }
+                        };
+                        const st = statusMap[data.status] || statusMap['pending'];
+                        document.getElementById('res-status').innerHTML =
+                            `<span style="background: ${st.bg}; color: ${st.color}; padding: 4px 12px; border-radius: 50px; font-weight: 700; font-size: 14px;">${st.text}</span>`;
+                    } else {
+                        showError(data.message || '予約が見つかりません。');
+                    }
+                } catch (e) {
+                    showError('サーバーとの通信に失敗しました。');
+                }
+                return;
+            }
+
+            showError('QRコードが無効です。招待リンクから再度アクセスしてください。');
+        })();
+    </script>
+</body>
+
+</html>

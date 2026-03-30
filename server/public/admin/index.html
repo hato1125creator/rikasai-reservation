@@ -1,0 +1,1650 @@
+<!DOCTYPE html>
+<html lang="ja">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>管理者画面 - 梨花祭2025</title>
+    <link rel="stylesheet" href="/css/style.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/gh/mebjas/html5-qrcode@latest/minified/html5-qrcode.min.js"></script>
+</head>
+
+<body>
+    <div class="main-container">
+        <!-- ログインモーダル -->
+        <div id="login-modal" class="modal">
+            <div class="modal-background" onclick="closeLoginModal()"></div>
+            <div class="modal-content">
+                <div class="glass-card">
+                    <h2 class="section-title">ログイン</h2>
+                    <div class="form-group">
+                        <label class="form-label">ユーザー名</label>
+                        <input class="form-input" type="text" id="login-username" placeholder="ユーザー名を入力してください">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">パスワード</label>
+                        <input class="form-input" type="password" id="login-password" placeholder="パスワードを入力してください">
+                    </div>
+                    <div class="form-group">
+                        <button class="btn btn-primary" onclick="login()">ログイン</button>
+                    </div>
+                    <div id="login-error-message" class="notification is-error is-hidden"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 通知エリア -->
+        <div id="notification-container" style="position: fixed; top: 2rem; right: 2rem; z-index: 1000;"></div>
+        <div id="checkin-notification" class="checkin-notification"></div>
+
+        <!-- ナビゲーション -->
+        <nav class="navbar" id="navbar" style="display: none;">
+            <div class="navbar-brand">
+                管理システム
+            </div>
+            <div class="navbar-menu">
+                <div class="navbar-start">
+                    <a class="navbar-item" href="/admin">予約一覧</a>
+                    <a class="navbar-item" href="/guest">ゲスト画面</a>
+                </div>
+                <div class="navbar-end">
+                    <button class="btn btn-danger" onclick="logout()">ログアウト</button>
+                </div>
+            </div>
+        </nav>
+
+        <!-- メインコンテンツ -->
+        <div class="content-wrapper" id="main-content" style="display: none;">
+            <!-- ページヘッダー -->
+            <div class="page-header">
+                <div class="admin-container">
+                    <h1 class="page-title">管理者ダッシュボード</h1>
+                    <p class="page-subtitle">イベント予約・入場管理システム</p>
+                </div>
+            </div>
+
+            <!-- タブナビゲーション -->
+            <div class="tabs">
+                <ul class="tab-list" id="tab-list">
+                    <li class="tab-item is-active" data-target="tab-reservations">
+                        <a class="tab-link">🎫 ゲスト一覧</a>
+                    </li>
+                    <li class="tab-item" data-target="tab-search">
+                        <a class="tab-link">🔍 検索</a>
+                    </li>
+                    <li class="tab-item" data-target="tab-qr">
+                        <a class="tab-link">📷 QRスキャン</a>
+                    </li>
+                    <li class="tab-item" data-target="tab-students">
+                        <a class="tab-link">👨‍🏫 生徒管理</a>
+                    </li>
+                    <li class="tab-item" data-target="tab-settings">
+                        <a class="tab-link">⚙️ 設定</a>
+                    </li>
+                    <li class="tab-item" data-target="tab-report">
+                        <a class="tab-link">📊 レポート</a>
+                    </li>
+                    <li class="tab-item" data-target="tab-manual">
+                        <a class="tab-link">📚 マニュアル</a>
+                    </li>
+                </ul>
+            </div>
+
+            <div class="admin-container">
+                <!-- ゲスト招待一覧タブ -->
+                <div id="tab-reservations" class="tab-content">
+                    <div class="glass-card">
+                        <div style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:1rem; margin-bottom:1.5rem;">
+                            <h2 class="section-title" style="margin:0;">🎫 ゲスト招待一覧</h2>
+                            <button class="btn btn-outline" onclick="exportCsv()" style="font-size:0.85rem;">⬇️ CSVエクスポート</button>
+                        </div>
+
+                        <div class="filter-bar">
+                            <div class="filter-group">
+                                <label class="form-label mb-0">ステータス:</label>
+                                <select class="form-select" id="status-filter" style="min-width: 160px;">
+                                    <option value="">すべての状態</option>
+                                    <option value="used">入場済み</option>
+                                    <option value="unused">未使用</option>
+                                </select>
+                            </div>
+                            <div class="filter-group">
+                                <input class="form-input" type="text" id="inline-search" placeholder="名前で絞り込み..." oninput="filterReservations()" style="min-width:180px;">
+                            </div>
+                            <button class="btn btn-primary" onclick="filterReservations()">フィルター</button>
+                        </div>
+
+                        <div id="guest-stats" style="display:flex; gap:1rem; margin-bottom:1rem; flex-wrap:wrap;"></div>
+
+                        <div style="overflow-x: auto;">
+                            <table class="data-table">
+                                <thead>
+                                    <tr>
+                                        <th>ゲスト名</th>
+                                        <th>招待した生徒</th>
+                                        <th>ステータス</th>
+                                        <th>作成日時</th>
+                                        <th>操作</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="reservation-table-body">
+                                    <!-- 動的に挿入されるコンテンツ -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ゲスト検索タブ -->
+                <div id="tab-search" class="tab-content is-hidden">
+                    <div class="glass-card">
+                        <h2 class="section-title">ゲスト検索</h2>
+
+                        <div class="form-group">
+                            <label class="form-label">検索キーワード</label>
+                            <input class="form-input" type="text" id="search-query" placeholder="ゲスト名・生徒名を入力">
+                        </div>
+
+                        <button class="btn btn-primary" onclick="searchGuests()">検索する</button>
+
+                        <div id="search-results" class="mt-4"></div>
+                    </div>
+                </div>
+
+                <!-- QRコード読み取りタブ -->
+                <div id="tab-qr" class="tab-content is-hidden">
+                    <div class="glass-card">
+                        <h2 class="section-title">QRコード読み取り</h2>
+
+                        <div class="qr-reader-container">
+                            <div class="form-group">
+                                <label class="form-label">読み取り方法</label>
+                                <select class="form-select" id="reader-type">
+                                    <option value="webcam">Webカメラ</option>
+                                    <option value="manual">手動入力</option>
+                                </select>
+                            </div>
+
+                            <div id="webcam-options" class="form-group">
+                                <label class="form-label">カメラ選択</label>
+                                <select class="form-select" id="camera-select"></select>
+                                <button class="btn btn-primary mt-2" onclick="startQrScanner()">
+                                    スキャン開始
+                                </button>
+                            </div>
+
+                            <div id="manual-input" class="form-group" style="display: none;">
+                                <label class="form-label">QRコードURL</label>
+                                <input class="form-input" type="text" id="manual-code"
+                                    placeholder="http://localhost:3007/guest/verify?id=">
+                                <button class="btn btn-primary mt-2" onclick="verifyManualCode()">
+                                    検証実行
+                                </button>
+                            </div>
+
+                            <div id="qr-reader"></div>
+                            <div id="result" class="scan-result">
+                                スキャン結果がここに表示されます
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 生徒管理タブ -->
+                <div id="tab-students" class="tab-content is-hidden">
+                    <div class="glass-card">
+                        <div style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:1rem; margin-bottom:1.5rem;">
+                            <h2 class="section-title" style="margin:0;">👨‍🏫 登録生徒管理</h2>
+                            <button class="btn btn-primary" onclick="loadStudentList()">🔄 更新</button>
+                        </div>
+                        <p style="color: var(--text-secondary); margin-bottom: 1.5rem; font-size: 0.9rem;">学校メール（@biblos.ac.jp）でOTP認証を完了した生徒の一覧です。削除すると関連する招待リンクも全て削除されます。</p>
+                        <div style="overflow-x: auto;">
+                            <table class="data-table">
+                                <thead>
+                                    <tr>
+                                        <th>氏名</th>
+                                        <th>メールアドレス</th>
+                                        <th>招待枠使用</th>
+                                        <th>入場済</th>
+                                        <th>登録日時</th>
+                                        <th>操作</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="student-table-body">
+                                    <tr><td colspan="6" style="text-align:center;">読み込み中...</td></tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- システム設定タブ -->
+                <div id="tab-settings" class="tab-content is-hidden">
+                    <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(340px,1fr)); gap:1.5rem;">
+
+                        <!-- 現在の設定 -->
+                        <div class="glass-card">
+                            <h2 class="section-title">📊 システム情報</h2>
+                            <div id="settings-info" style="display:grid; gap:0.75rem;">
+                                <div style="padding:0.75rem; background:var(--bg-main); border-radius:var(--radius-small);">
+                                    <span style="color:var(--text-secondary); font-size:0.85rem;">登録生徒数</span>
+                                    <div id="si-students" style="font-size:1.5rem; font-weight:700;">-</div>
+                                </div>
+                                <div style="padding:0.75rem; background:var(--bg-main); border-radius:var(--radius-small);">
+                                    <span style="color:var(--text-secondary); font-size:0.85rem;">招待スロット録象数</span>
+                                    <div id="si-slots" style="font-size:1.5rem; font-weight:700;">-</div>
+                                </div>
+                                <div style="padding:0.75rem; background:var(--bg-main); border-radius:var(--radius-small);">
+                                    <span style="color:var(--text-secondary); font-size:0.85rem;">入場済みスロット</span>
+                                    <div id="si-checkedin" style="font-size:1.5rem; font-weight:700; color:var(--success);">-</div>
+                                </div>
+                                <div style="padding:0.75rem; background:var(--bg-main); border-radius:var(--radius-small);">
+                                    <span style="color:var(--text-secondary); font-size:0.85rem;">生徒あたり招待枠数</span>
+                                    <div id="si-slots-per-student" style="font-size:1.5rem; font-weight:700;">-</div>
+                                </div>
+                            </div>
+                            <button class="btn btn-primary" onclick="loadSettings()" style="margin-top:1rem; width:100%;">🔄 情報を更新</button>
+                        </div>
+
+                        <!-- パスワード変更 -->
+                        <div class="glass-card">
+                            <h2 class="section-title">🔐 管理者パスワード変更</h2>
+                            <div class="form-group">
+                                <label class="form-label">現在のパスワード</label>
+                                <input class="form-input" type="password" id="pw-current" placeholder="現在のパスワード">
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">新しいパスワード（8文字以上）</label>
+                                <input class="form-input" type="password" id="pw-new" placeholder="新しいパスワード">
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">新しいパスワード（確認）</label>
+                                <input class="form-input" type="password" id="pw-confirm" placeholder="入力を再度確認">
+                            </div>
+                            <button class="btn btn-primary" onclick="changePassword()" style="width:100%;">パスワードを変更</button>
+                        </div>
+
+                        <!-- データエクスポート -->
+                        <div class="glass-card">
+                            <h2 class="section-title">⬇️ データエクスポート</h2>
+                            <p style="color:var(--text-secondary); font-size:0.9rem; margin-bottom:1.5rem;">ゲスト招待一覧をCSVファイルでダウンロードします。Excelで開くことができます。</p>
+                            <button class="btn btn-success" onclick="exportCsv()" style="width:100%;">📄 ゲスト一覧CSVをDL</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- レポート/ダッシュボードタブ -->
+                <div id="tab-report" class="tab-content is-hidden">
+                    <!-- 概要メトリクス -->
+                    <div class="dashboard-grid">
+                        <div class="metric-card">
+                            <div class="metric-value" id="total-count">-</div>
+                            <div class="metric-label">総予約数</div>
+                            <div class="metric-change" id="total-change">-</div>
+                        </div>
+                        <div class="metric-card success">
+                            <div class="metric-value" id="checked-in-count">-</div>
+                            <div class="metric-label">入場済み</div>
+                            <div class="metric-change" id="checked-in-percent">-%</div>
+                        </div>
+                        <div class="metric-card warning">
+                            <div class="metric-value" id="pending-count">-</div>
+                            <div class="metric-label">保留中</div>
+                            <div class="metric-change" id="pending-percent">-%</div>
+                        </div>
+                        <div class="metric-card danger">
+                            <div class="metric-value" id="cancelled-count">-</div>
+                            <div class="metric-label">キャンセル</div>
+                            <div class="metric-change" id="cancelled-percent">-%</div>
+                        </div>
+                    </div>
+
+                    <!-- グラフエリア -->
+                    <div class="chart-grid">
+                        <div class="glass-card">
+                            <h3 class="section-title">予約状況分布</h3>
+                            <div class="chart-container">
+                                <canvas id="statusChart" height="200"></canvas>
+                            </div>
+                        </div>
+
+                        <div class="glass-card">
+                            <h3 class="section-title">時間帯別入場者数</h3>
+                            <div class="chart-container">
+                                <canvas id="hourlyChart" height="200"></canvas>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="glass-card">
+                        <h3 class="section-title">日別入場者数推移</h3>
+                        <div class="chart-container">
+                            <canvas id="dailyChart" height="150"></canvas>
+                        </div>
+                    </div>
+
+                    <!-- 詳細統計情報 -->
+                    <div class="glass-card">
+                        <h3 class="section-title">詳細統計情報</h3>
+                        <div
+                            style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 2rem;">
+                            <table class="data-table">
+                                <tbody>
+                                    <tr>
+                                        <th>ピーク時間帯</th>
+                                        <td id="peak-time">-</td>
+                                    </tr>
+                                    <tr>
+                                        <th>平均処理時間</th>
+                                        <td id="avg-checkin-time">-</td>
+                                    </tr>
+                                    <tr>
+                                        <th>最新入場</th>
+                                        <td id="latest-checkin">-</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                            <table class="data-table">
+                                <tbody>
+                                    <tr>
+                                        <th>入場率</th>
+                                        <td id="checkin-rate">-</td>
+                                    </tr>
+                                    <tr>
+                                        <th>キャンセル率</th>
+                                        <td id="cancel-rate">-</td>
+                                    </tr>
+                                    <tr>
+                                        <th>残り予定数</th>
+                                        <td id="remaining-count">-</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <!-- コントロールエリア -->
+                    <div class="glass-card">
+                        <div style="display: flex; align-items: center; gap: 2rem; flex-wrap: wrap;">
+                            <label style="display: flex; align-items: center; gap: 0.5rem;">
+                                <input type="checkbox" id="auto-refresh">
+                                <span>30秒ごとに自動更新</span>
+                            </label>
+                            <div style="display: flex; gap: 1rem;">
+                                <button class="btn btn-primary" onclick="loadDashboard()">
+                                    ダッシュボード更新
+                                </button>
+                                <button class="btn btn-outline" onclick="exportReportData()">
+                                    データエクスポート
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+                <!-- マニュアルタブ -->
+                <div id="tab-manual" class="tab-content is-hidden" style="max-width:860px; margin:0 auto;">
+                    <div class="glass-card">
+                        <h2 class="section-title">📚 システム操作マニュアル</h2>
+                        <p style="color:var(--text-secondary); margin-bottom:2rem;">全ての機能の使い方を初心者向けに説明します。</p>
+
+                        <div style="border-left:4px solid var(--primary); padding:1rem 1.5rem; margin-bottom:2rem; background:var(--bg-main); border-radius:0 var(--radius-small) var(--radius-small) 0;">
+                            <h3 style="font-size:1.1rem; margin-bottom:0.75rem;">STEP 1 — 管理者ログイン</h3>
+                            <ol style="line-height:2.2; padding-left:1.5rem; color:var(--text-secondary);">
+                                <li>ブラウザで <code>/admin/</code> を開く</li>
+                                <li>「ユーザー名」に <strong>admin</strong> を入力</li>
+                                <li>「パスワード」に設定したパスワードを入力（初期: <code>rikasai123</code>）</li>
+                                <li>「ログイン」ボタンを押す</li>
+                            </ol>
+                        </div>
+
+                        <div style="border-left:4px solid #10b981; padding:1rem 1.5rem; margin-bottom:2rem; background:var(--bg-main); border-radius:0 var(--radius-small) var(--radius-small) 0;">
+                            <h3 style="font-size:1.1rem; margin-bottom:0.75rem;">STEP 2 — 生徒が招待リンクを作る流れ</h3>
+                            <p style="color:var(--text-secondary); margin-bottom:0.75rem;">生徒は以下の手順で招待リンクを作成します。管理者の作業は不要です。</p>
+                            <ol style="line-height:2.2; padding-left:1.5rem; color:var(--text-secondary);">
+                                <li><code>/student/</code> を開く</li>
+                                <li>「新規登録」タブ → 学校メール（<code>@biblos.ac.jp</code>）と氏名を入力し「認証コードを送信」</li>
+                                <li>メールに届いた6桁のコードを入力してログイン</li>
+                                <li>ダッシュボードで「ゲスト名を入力」→「招待リンクを作成」</li>
+                                <li>生成されたリンク（例: <code>http://xxx/guest/?token=...</code>）をゲストに送信</li>
+                            </ol>
+                        </div>
+
+                        <div style="border-left:4px solid #f59e0b; padding:1rem 1.5rem; margin-bottom:2rem; background:var(--bg-main); border-radius:0 var(--radius-small) var(--radius-small) 0;">
+                            <h3 style="font-size:1.1rem; margin-bottom:0.75rem;">STEP 3 — ゲストのQRコード表示</h3>
+                            <ol style="line-height:2.2; padding-left:1.5rem; color:var(--text-secondary);">
+                                <li>ゲストが招待リンクをタップするだけでQRコードが表示される</li>
+                                <li>個人情報の入力は不要</li>
+                                <li>QRコードは届け出た際にスタッフがスキャン</li>
+                            </ol>
+                        </div>
+
+                        <div style="border-left:4px solid #6366f1; padding:1rem 1.5rem; margin-bottom:2rem; background:var(--bg-main); border-radius:0 var(--radius-small) var(--radius-small) 0;">
+                            <h3 style="font-size:1.1rem; margin-bottom:0.75rem;">STEP 4 — QRコードで入場チェックイン</h3>
+                            <ol style="line-height:2.2; padding-left:1.5rem; color:var(--text-secondary);">
+                                <li>「📷 QRスキャン」タブを開く</li>
+                                <li>「Webカメラ」または「手動入力」を選択</li>
+                                <li>ゲストのQRコードをカメラにかざす or URLを貼り付けて「検証」</li>
+                                <li>緑の「入場完了しました」の表示と音が鳴ったら成功</li>
+                            </ol>
+                        </div>
+
+                        <div style="border-left:4px solid #ef4444; padding:1rem 1.5rem; margin-bottom:2rem; background:var(--bg-main); border-radius:0 var(--radius-small) var(--radius-small) 0;">
+                            <h3 style="font-size:1.1rem; margin-bottom:0.75rem;">管理者向け — 各タブの機能</h3>
+                            <table class="data-table" style="font-size:0.9rem;">
+                                <thead><tr><th>タブ</th><th>機能</th></tr></thead>
+                                <tbody>
+                                    <tr><td>🎫 ゲスト一覧</td><td>全招待スロット・手動チェックイン・取り消し・削除・URLコピー</td></tr>
+                                    <tr><td>🔍 検索</td><td>ゲスト名・生徒名で絞り込み</td></tr>
+                                    <tr><td>📷 QRスキャン</td><td>カメラまたは手動URLでチェックイン</td></tr>
+                                    <tr><td>👨‍🏫 生徒管理</td><td>登録生徒一覧・招待枠数確認・アカウント削除</td></tr>
+                                    <tr><td>⚙️ 設定</td><td>システム情報確認・PW変更・CSVエクスポート</td></tr>
+                                    <tr><td>📊 レポート</td><td>リアルタイム統計・入場率グラフ</td></tr>
+                                </tbody>
+                            </table>
+                        </div>
+
+                        <div style="border-left:4px solid #6b7280; padding:1rem 1.5rem; background:var(--bg-main); border-radius:0 var(--radius-small) var(--radius-small) 0;">
+                            <h3 style="font-size:1.1rem; margin-bottom:0.75rem;">⚠ 注意事項</h3>
+                            <ul style="line-height:2.2; padding-left:1.5rem; color:var(--text-secondary);">
+                                <li>メールは <strong>@biblos.ac.jp</strong> のアドレスのみ有効</li>
+                                <li>OTPは<strong>10分間有効</strong>・5分ごとに3回まで送信可</li>
+                                <li>ゲストQRコードは<strong>1回しか使えない</strong>（再入場不可）</li>
+                                <li>生徒を削除すると、その生徒の招待リンクは全て無効になります</li>
+                                <li>管理者パスワードは<strong>8文字以上</strong>で設定してください</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+    </div>
+
+    <!-- 音声ファイル -->
+    <audio id="success-sound" src="https://chisatosound.sakura.ne.jp/audio/correct_answer_01a.wav"
+        preload="auto"></audio>
+    <audio id="error-sound" src="bubump3.mp3" preload="auto"></audio>
+
+    <script>
+        // 定数定義
+        const API_BASE_URL = ""; // 空文字列にして絶対パスにする
+        const TOKEN_KEY = "jwtToken";
+        const REFRESH_INTERVAL_MS = 5000; // 5秒
+        const NOTIFICATION_DISPLAY_TIME_MS = 3000; // 3秒
+
+        // グローバル変数 (最小限に)
+        let html5QrCodeScanner;
+        let statusChart, hourlyChart, dailyChart;
+        let autoRefreshIntervalId;
+
+        // DOM要素のキャッシュ
+        const dom = {
+            loginModal: document.getElementById("login-modal"),
+            loginUsername: document.getElementById("login-username"),
+            loginPassword: document.getElementById("login-password"),
+            loginErrorMessage: document.getElementById("login-error-message"),
+            notificationContainer: document.getElementById("notification-container"),
+            checkinNotification: document.getElementById("checkin-notification"),
+            navbar: document.getElementById("navbar"),
+            mainContent: document.getElementById("main-content"),
+            tabList: document.getElementById("tab-list"),
+            statusFilter: document.getElementById("status-filter"),
+            reservationTableBody: document.getElementById("reservation-table-body"),
+            searchQuery: document.getElementById("search-query"),
+            searchResults: document.getElementById("search-results"),
+            readerType: document.getElementById("reader-type"),
+            webcamOptions: document.getElementById("webcam-options"),
+            manualInput: document.getElementById("manual-input"),
+            cameraSelect: document.getElementById("camera-select"),
+            qrReaderDiv: document.getElementById("qr-reader"),
+            scanResultDiv: document.getElementById("result"),
+            manualCodeInput: document.getElementById("manual-code"),
+            csvFile: document.getElementById("csv-file"),
+            prefixPart1: document.getElementById("prefix-part1"),
+            prefixPart2: document.getElementById("prefix-part2"),
+            generatedCodesDisplay: document.getElementById("generated-codes-display"),
+            generatedCodesTableBody: document.getElementById("generated-codes-table-body"),
+            totalCount: document.getElementById("total-count"),
+            checkedInCount: document.getElementById("checked-in-count"),
+            pendingCount: document.getElementById("pending-count"),
+            cancelledCount: document.getElementById("cancelled-count"),
+            checkedInPercent: document.getElementById("checked-in-percent"),
+            pendingPercent: document.getElementById("pending-percent"),
+            cancelledPercent: document.getElementById("cancelled-percent"),
+            peakTime: document.getElementById("peak-time"),
+            avgCheckinTime: document.getElementById("avg-checkin-time"),
+            latestCheckin: document.getElementById("latest-checkin"),
+            checkinRate: document.getElementById("checkin-rate"),
+            cancelRate: document.getElementById("cancel-rate"),
+            remainingCount: document.getElementById("remaining-count"),
+            statusChartCanvas: document.getElementById("statusChart"),
+            hourlyChartCanvas: document.getElementById("hourlyChart"),
+            dailyChartCanvas: document.getElementById("dailyChart"),
+            autoRefreshCheckbox: document.getElementById("auto-refresh"),
+            successSound: document.getElementById("success-sound"),
+            errorSound: document.getElementById("error-sound"),
+        };
+
+        // 認証付きfetch（401/403で自動ログアウト）
+        async function authFetch(url, options = {}) {
+            const token = localStorage.getItem(TOKEN_KEY);
+            if (!token) {
+                forceLogout();
+                throw new Error('認証トークンがありません。再ログインしてください。');
+            }
+            options.headers = {
+                ...options.headers,
+                "Authorization": `Bearer ${token}`
+            };
+            const response = await fetch(url, options);
+            if (response.status === 401 || response.status === 403) {
+                forceLogout();
+                throw new Error('セッションが期限切れです。再ログインしてください。');
+            }
+            return response;
+        }
+
+        function forceLogout() {
+            localStorage.removeItem(TOKEN_KEY);
+            dom.navbar.style.display = "none";
+            dom.mainContent.style.display = "none";
+            dom.loginModal.classList.add("is-active");
+            showNotification("セッションが期限切れです。再ログインしてください。", "warning");
+        }
+
+        // ページ初期化
+        window.onload = () => {
+            const token = localStorage.getItem(TOKEN_KEY);
+
+            if (!token) {
+                dom.loginModal.classList.add("is-active");
+            } else {
+                try {
+                    const payload = JSON.parse(atob(token.split(".")[1]));
+                    const userRole = payload.role;
+
+                    // トークン有効期限チェック
+                    if (payload.exp && payload.exp * 1000 < Date.now()) {
+                        console.warn("トークンが期限切れです。再ログインが必要です。");
+                        forceLogout();
+                        return;
+                    }
+
+                    dom.navbar.style.display = "flex";
+                    dom.mainContent.style.display = "block";
+
+                    // 学生用タブ制限
+                    if (userRole === "student") {
+                        dom.tabList.innerHTML = `
+                            <li class="tab-item is-active" data-target="tab-qr">
+                                <a class="tab-link">QRコード読み取り</a>
+                            </li>
+                        `;
+
+                        document.querySelectorAll(".tab-content").forEach((item) => {
+                            if (item.id !== "tab-qr") {
+                                item.classList.add("is-hidden");
+                            } else {
+                                item.classList.remove("is-hidden");
+                            }
+                        });
+                    }
+
+                    // 初期タブの表示
+                    const activeTab = dom.tabList.querySelector(".tab-item.is-active");
+                    if (activeTab) {
+                        showTab(activeTab.dataset.target);
+                    }
+
+                    updateReservations();
+                    initQrScanner();
+                    startAutoRefresh();
+
+                } catch (e) {
+                    console.error("トークン解析エラー:", e);
+                    localStorage.removeItem(TOKEN_KEY);
+                    dom.loginModal.classList.add("is-active");
+                }
+            }
+
+            // イベントリスナー設定
+            dom.tabList.addEventListener("click", (event) => {
+                const targetTabItem = event.target.closest(".tab-item");
+                if (targetTabItem) {
+                    showTab(targetTabItem.dataset.target);
+                    if (targetTabItem.dataset.target === 'tab-settings') loadSettings();
+                    if (targetTabItem.dataset.target === 'tab-students') loadStudentList();
+                }
+            });
+
+            dom.readerType.addEventListener("change", function () {
+                if (this.value === "webcam") {
+                    dom.webcamOptions.style.display = "block";
+                    dom.manualInput.style.display = "none";
+                    if (html5QrCodeScanner) {
+                        html5QrCodeScanner.stop().catch(err => console.warn("QRスキャナー停止エラー:", err));
+                    }
+                    initQrScanner(); // カメラ選択を再初期化
+                } else {
+                    dom.webcamOptions.style.display = "none";
+                    dom.manualInput.style.display = "block";
+                    if (html5QrCodeScanner) {
+                        html5QrCodeScanner.stop().catch(err => console.warn("QRスキャナー停止エラー:", err));
+                    }
+                }
+            });
+
+            dom.autoRefreshCheckbox.addEventListener("change", (event) => {
+                if (event.target.checked) {
+                    startAutoRefresh();
+                } else {
+                    stopAutoRefresh();
+                }
+            });
+        };
+
+        // === 認証関連 ===
+        function closeLoginModal() {
+            dom.loginModal.classList.remove("is-active");
+        }
+
+        async function login() {
+            const username = dom.loginUsername.value;
+            const password = dom.loginPassword.value;
+
+            try {
+                const response = await fetch(`${API_BASE_URL}/api/login`, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ username, password })
+                });
+                const data = await response.json();
+
+                if (data.success) {
+                    localStorage.setItem(TOKEN_KEY, data.token);
+                    closeLoginModal();
+                    window.location.reload();
+                } else {
+                    dom.loginErrorMessage.textContent = data.message;
+                    dom.loginErrorMessage.classList.remove("is-hidden");
+                    dom.loginErrorMessage.classList.add("is-visible");
+                }
+            } catch (error) {
+                console.error("ログインエラー:", error);
+                showNotification("ログイン中にエラーが発生しました。", "error");
+            }
+        }
+
+        function logout() {
+            localStorage.removeItem(TOKEN_KEY);
+            window.location.reload();
+        }
+
+        // === タブ切り替え ===
+        function showTab(tabId) {
+            document.querySelectorAll(".tab-content").forEach(content => {
+                content.classList.add("is-hidden");
+            });
+            document.getElementById(tabId).classList.remove("is-hidden");
+
+            document.querySelectorAll(".tab-item").forEach(item => {
+                item.classList.remove("is-active");
+            });
+            document.querySelector(`.tab-item[data-target="${tabId}"]`).classList.add("is-active");
+
+            // QRコードタブに切り替わったらスキャナーを初期化
+            if (tabId === "tab-qr") {
+                initQrScanner();
+            } else if (html5QrCodeScanner) {
+                html5QrCodeScanner.stop().catch(err => console.warn("QRスキャナー停止エラー:", err));
+            }
+            // レポートタブに切り替わったらダッシュボードをロード
+            if (tabId === "tab-report") {
+                loadDashboard();
+            }
+        }
+
+        // === 通知システム ===
+        function showNotification(message, type = "info") {
+            const notificationDiv = document.createElement("div");
+            notificationDiv.className = `notification is-${type}`;
+            notificationDiv.textContent = message;
+            dom.notificationContainer.appendChild(notificationDiv);
+
+            // アニメーション
+            setTimeout(() => {
+                notificationDiv.classList.add("is-visible");
+            }, 10);
+
+            setTimeout(() => {
+                notificationDiv.classList.remove("is-visible");
+                notificationDiv.addEventListener("transitionend", () => {
+                    notificationDiv.remove();
+                });
+            }, NOTIFICATION_DISPLAY_TIME_MS);
+        }
+
+        function showCheckinNotification(message) {
+            dom.checkinNotification.textContent = message;
+            dom.checkinNotification.style.display = "block";
+            setTimeout(() => {
+                dom.checkinNotification.style.display = "none";
+            }, NOTIFICATION_DISPLAY_TIME_MS);
+        }
+
+        // === QRコードスキャナー ===
+        async function initQrScanner() {
+            try {
+                const devices = await Html5Qrcode.getCameras();
+                dom.cameraSelect.innerHTML = "";
+
+                if (devices.length === 0) {
+                    showNotification("利用可能なカメラが見つかりませんでした。", "warning");
+                    return;
+                }
+
+                devices.forEach(device => {
+                    const option = document.createElement("option");
+                    option.value = device.id;
+                    option.textContent = device.label || `カメラ ${dom.cameraSelect.children.length + 1}`;
+                    dom.cameraSelect.appendChild(option);
+                });
+
+                if (devices.length > 0) {
+                    dom.cameraSelect.value = devices[0].id;
+                }
+            } catch (err) {
+                console.error("カメラ取得エラー:", err);
+                showNotification("カメラの取得に失敗しました。", "error");
+            }
+        }
+
+        function startQrScanner() {
+            const cameraId = dom.cameraSelect.value;
+            if (!cameraId) {
+                showNotification("カメラが選択されていません。", "warning");
+                return;
+            }
+
+            if (html5QrCodeScanner) {
+                html5QrCodeScanner.stop().catch(err => console.warn("既存のQRスキャナー停止エラー:", err));
+            }
+
+            html5QrCodeScanner = new Html5Qrcode("qr-reader");
+
+            html5QrCodeScanner.start(
+                { deviceId: { exact: cameraId } },
+                { fps: 10, qrbox: { width: 250, height: 250 } },
+                (decodedText, decodedResult) => {
+                    console.log("QRコードスキャン成功:", decodedText);
+                    // 連続スキャンを可能にするため、スキャナーは停止しない
+                    verifyReservation(decodedText);
+                },
+                (errorMessage) => {
+                    // エラーメッセージはコンソールにのみ出力し、UIには表示しない (連続スキャン中のノイズを避けるため)
+                    // console.warn("QRスキャンエラー:", errorMessage);
+                }
+            ).catch(error => {
+                console.error("QRコードスキャン開始エラー:", error);
+                showNotification("QRコードのスキャン開始に失敗しました。", "error");
+            });
+            showNotification("QRコードスキャンを開始しました。", "info");
+        }
+
+        function verifyManualCode() {
+            const manualCode = dom.manualCodeInput.value;
+            if (!manualCode) {
+                showNotification("QRコードを入力してください。", "warning");
+                return;
+            }
+            verifyReservation(manualCode);
+        }
+
+        async function verifyReservation(decodedText) {
+            let token = null;
+            let reservationId = null;
+            try {
+                const url = new URL(decodedText);
+                token = url.searchParams.get('token');
+                reservationId = url.searchParams.get('id');
+
+                if (!token && !reservationId) {
+                    showNotification('QRコードに有効なトークンが含まれていません。', 'error');
+                    dom.scanResultDiv.className = 'scan-result error';
+                    dom.scanResultDiv.innerHTML = '<strong>エラー:</strong> 無効なQRコードです';
+                    playErrorSound();
+                    return;
+                }
+            } catch (error) {
+                console.error('URL解析エラー:', error);
+                showNotification('無効なQRコードです。正しい形式のQRコードをスキャンしてください。', 'error');
+                dom.scanResultDiv.className = 'scan-result error';
+                dom.scanResultDiv.innerHTML = '<strong>エラー:</strong> 読み取りに失敗しました';
+                playErrorSound();
+                return;
+            }
+
+            dom.scanResultDiv.className = 'scan-result';
+            dom.scanResultDiv.innerHTML = '確認中...';
+
+            try {
+                const response = await fetch(`${API_BASE_URL}/api/verify`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${localStorage.getItem(TOKEN_KEY)}`
+                    },
+                    body: JSON.stringify({ qrData: decodedText })
+                });
+                const data = await response.json();
+
+                if (!response.ok) {
+                    throw new Error(data.message || 'Unknown error occurred');
+                }
+
+                if (data.message === '入場が承認されました。') {
+                    displayReservationDetails(data);
+                    showCheckinNotification('入場完了しました');
+                    playSuccessSound();
+                    updateReservations();
+                } else if (data.message === '既に入場済みです。') {
+                    displayReservationDetails(data);
+                    showCheckinNotification('既に入場済みです');
+                    playSuccessSound();
+                } else {
+                    showNotification(data.message || '確認できませんでした', 'error');
+                    dom.scanResultDiv.className = 'scan-result error';
+                    dom.scanResultDiv.innerHTML = `<strong>エラー:</strong> ${data.message || 'エラーが発生しました'}`;
+                    playErrorSound();
+                }
+            } catch (error) {
+                console.error('QR確認エラー:', error);
+                showNotification('確認に失敗しました。', 'error');
+                dom.scanResultDiv.className = 'scan-result error';
+                dom.scanResultDiv.innerHTML = '<strong>通信エラー:</strong> サーバーとの通信に失敗しました';
+                playErrorSound();
+            }
+        }
+
+        function playSuccessSound() {
+            dom.successSound.currentTime = 0;
+            dom.successSound.play().catch(error => console.log("音声再生エラー:", error));
+        }
+
+        function playErrorSound() {
+            dom.errorSound.currentTime = 0;
+            dom.errorSound.play().catch(error => console.log("音声再生エラー:", error));
+        }
+
+        function displayReservationDetails(data) {
+            dom.scanResultDiv.className = "scan-result success";
+            // guest_slot方式
+            if (data.slot) {
+                dom.scanResultDiv.innerHTML = `
+                    <strong>${data.slot.guest_name}</strong> さん<br>
+                    招待した生徒: ${data.slot.student_name || '—'}<br>
+                    ステータス: <strong>入場済み ✅</strong>
+                `;
+            } else if (data.reservation) {
+                // 旧方式後方互換
+                const reservation = data.reservation;
+                dom.scanResultDiv.innerHTML = `
+                    <strong>${reservation.name}</strong> 様 (${getStatusText(reservation.status)})<br>
+                    連絡先: ${reservation.contact || '—'}
+                `;
+            }
+        }
+
+        // === 予約一覧管理 ===
+        function getStatusClass(status) {
+            switch (status) {
+                case "pending": return "status-pending";
+                case "checked-in": return "status-checked-in";
+                case "cancelled": return "status-cancelled";
+                default: return "";
+            }
+        }
+
+        function getStatusText(status) {
+            switch (status) {
+                case "pending": return "保留中";
+                case "checked-in": return "入場済み";
+                case "cancelled": return "キャンセル";
+                default: return "不明";
+            }
+        }
+
+        function formatDateTime(datetime) {
+            if (!datetime) return "-";
+            const date = new Date(datetime);
+            return `${date.getFullYear()}年${date.getMonth() + 1}月${date.getDate()}日 ${date.getHours()}時${date.getMinutes()}分`;
+        }
+
+        async function updateReservations() {
+            const statusFilter = dom.statusFilter ? dom.statusFilter.value : '';
+            const inlineSearch = document.getElementById('inline-search') ? document.getElementById('inline-search').value.toLowerCase() : '';
+            try {
+                const response = await authFetch(`${API_BASE_URL}/api/admin/guest-slots`);
+                if (!response.ok) throw new Error('ゲスト招待情報の取得に失敗しました。');
+                let { slots } = await response.json();
+
+                // stats
+                const statsDiv = document.getElementById('guest-stats');
+                if (statsDiv) {
+                    const total = slots.length;
+                    const used = slots.filter(s => s.used).length;
+                    statsDiv.innerHTML = `
+                        <span style="background:var(--bg-main);padding:0.4rem 1rem;border-radius:999px;font-size:0.85rem;">合計 <strong>${total}</strong> 件</span>
+                        <span style="background:var(--success);color:#fff;padding:0.4rem 1rem;border-radius:999px;font-size:0.85rem;">入場済み <strong>${used}</strong> 件</span>
+                        <span style="background:var(--warning);color:#fff;padding:0.4rem 1rem;border-radius:999px;font-size:0.85rem;">未使用 <strong>${total - used}</strong> 件</span>`;
+                }
+
+                if (statusFilter === 'used') slots = slots.filter(s => s.used);
+                else if (statusFilter === 'unused') slots = slots.filter(s => !s.used);
+                if (inlineSearch) slots = slots.filter(s =>
+                    (s.guest_name || '').toLowerCase().includes(inlineSearch) ||
+                    (s.student_name || '').toLowerCase().includes(inlineSearch)
+                );
+
+                dom.reservationTableBody.innerHTML = '';
+                if (slots.length === 0) {
+                    dom.reservationTableBody.innerHTML = '<tr><td colspan="5" style="text-align:center;">データがありません</td></tr>';
+                    return;
+                }
+                const origin = window.location.origin;
+                slots.forEach(slot => {
+                    const row = document.createElement('tr');
+                    const guestUrl = `${origin}/guest/?token=${slot.token}`;
+                    row.innerHTML = `
+                        <td><strong>${slot.guest_name}</strong></td>
+                        <td>${slot.student_name || '—'}</td>
+                        <td>
+                            <span class="status-tag ${slot.used ? 'status-checked-in' : 'status-pending'}">
+                                ${slot.used ? '✅ 入場済み' : '⏳ 未使用'}
+                            </span>
+                            ${slot.used && slot.checked_in_at ? `<br><small style="color:var(--text-secondary);">${formatDateTime(slot.checked_in_at)}</small>` : ''}
+                        </td>
+                        <td>${formatDateTime(slot.createdAt)}</td>
+                        <td>
+                            <div style="display:flex;gap:0.4rem;flex-wrap:wrap;">
+                                <button class="btn btn-outline" style="font-size:0.75rem;padding:0.3rem 0.6rem;" onclick="copyGuestUrl('${guestUrl}')">🔗 URL</button>
+                                ${!slot.used
+                                    ? `<button class="btn btn-success" style="font-size:0.75rem;padding:0.3rem 0.6rem;" onclick="checkInSlot('${slot.id}')">入場</button>`
+                                    : `<button class="btn btn-outline" style="font-size:0.75rem;padding:0.3rem 0.6rem;" onclick="uncheckInSlot('${slot.id}')">取消</button>`
+                                }
+                                <button class="btn btn-danger" style="font-size:0.75rem;padding:0.3rem 0.6rem;" onclick="deleteSlot('${slot.id}', '${slot.guest_name}')">削除</button>
+                            </div>
+                        </td>
+                    `;
+                    dom.reservationTableBody.appendChild(row);
+                });
+            } catch (error) {
+                console.error('ゲスト招待情報取得エラー:', error);
+                showNotification('ゲスト招待情報の取得に失敗しました。', 'error');
+            }
+        }
+
+        function filterReservations() { updateReservations(); }
+
+        function copyGuestUrl(url) {
+            navigator.clipboard.writeText(url).then(() => {
+                showNotification('招待URLをコピーしました！', 'success');
+            }).catch(() => {
+                prompt('URLをコピーしてください:', url);
+            });
+        }
+
+        async function uncheckInSlot(id) {
+            if (!confirm('このゲストのチェックインを取り消しますか？')) return;
+            try {
+                const res = await authFetch(`${API_BASE_URL}/api/admin/guest-slots/${id}/uncheck-in`, { method: 'POST' });
+                const data = await res.json();
+                showNotification(data.message, res.ok ? 'success' : 'error');
+                if (res.ok) updateReservations();
+            } catch (e) { showNotification('取り消しに失敗しました。', 'error'); }
+        }
+
+        async function deleteSlot(id, name) {
+            if (!confirm(`「${name}」の招待スロットを削除しますか？この操作は取り消せません。`)) return;
+            try {
+                const res = await authFetch(`${API_BASE_URL}/api/admin/guest-slots/${id}`, { method: 'DELETE' });
+                const data = await res.json();
+                showNotification(data.message, res.ok ? 'success' : 'error');
+                if (res.ok) updateReservations();
+            } catch (e) { showNotification('削除に失敗しました。', 'error'); }
+        }
+
+        async function loadSettings() {
+            try {
+                const res = await authFetch(`${API_BASE_URL}/api/admin/settings`);
+                if (!res.ok) throw new Error();
+                const d = await res.json();
+                document.getElementById('si-students').textContent = d.totalStudents + ' 人';
+                document.getElementById('si-slots').textContent = d.totalSlots + ' 件';
+                document.getElementById('si-checkedin').textContent = d.checkedInSlots + ' 件';
+                document.getElementById('si-slots-per-student').textContent = d.guestSlotsPerStudent + ' 枠';
+            } catch { showNotification('設定の取得に失敗しました。', 'error'); }
+        }
+
+        async function changePassword() {
+            const cur = document.getElementById('pw-current').value;
+            const nw = document.getElementById('pw-new').value;
+            const conf = document.getElementById('pw-confirm').value;
+            if (!cur || !nw || !conf) { showNotification('全ての項目を入力してください。', 'error'); return; }
+            if (nw !== conf) { showNotification('新しいパスワードが一致しません。', 'error'); return; }
+            if (nw.length < 8) { showNotification('パスワードは8文字以上で設定してください。', 'error'); return; }
+            try {
+                const res = await authFetch(`${API_BASE_URL}/api/admin/change-password`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ currentPassword: cur, newPassword: nw })
+                });
+                const data = await res.json();
+                showNotification(data.message, res.ok ? 'success' : 'error');
+                if (res.ok) {
+                    document.getElementById('pw-current').value = '';
+                    document.getElementById('pw-new').value = '';
+                    document.getElementById('pw-confirm').value = '';
+                }
+            } catch { showNotification('パスワード変更に失敗しました。', 'error'); }
+        }
+
+        async function exportCsv() {
+            try {
+                const res = await authFetch(`${API_BASE_URL}/api/admin/export/csv`);
+                if (!res.ok) throw new Error('エクスポートに失敗しました。');
+                
+                const blob = await res.blob();
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = "guest_list.csv";
+                document.body.appendChild(a);
+                a.click();
+                a.remove();
+                window.URL.revokeObjectURL(url);
+            } catch (error) {
+                showNotification('CSVのエクスポートに失敗しました。', 'error');
+            }
+        }
+
+
+        async function checkInSlot(id) {
+            try {
+                const res = await authFetch(`${API_BASE_URL}/api/admin/guest-slots/${id}/check-in`, { method: 'POST' });
+                const data = await res.json();
+                if (res.ok) {
+                    showNotification('チェックイン完了', 'success');
+                    updateReservations();
+                } else {
+                    showNotification(data.message || 'チェックインに失敗しました。', 'error');
+                }
+            } catch (e) {
+                showNotification('通信エラーが発生しました。', 'error');
+            }
+        }
+
+        async function loadStudentList() {
+            const tbody = document.getElementById('student-table-body');
+            tbody.innerHTML = '<tr><td colspan="4" style="text-align:center;">読み込み中...</td></tr>';
+            try {
+                // 生徒一覧はguest_slotsから生徒名+メールを集計
+                const [slotsRes, studRes] = await Promise.all([
+                    authFetch(`${API_BASE_URL}/api/admin/guest-slots`),
+                    authFetch(`${API_BASE_URL}/api/admin/students`)
+                ]);
+
+                if (studRes && studRes.ok) {
+                    const { students } = await studRes.json();
+                    tbody.innerHTML = '';
+                    if (students.length === 0) {
+                        tbody.innerHTML = '<tr><td colspan="4" style="text-align:center;">登録された生徒はいません</td></tr>';
+                        return;
+                    }
+
+                    // スロット数を集計
+                    const { slots } = await slotsRes.json();
+                    const slotCountMap = {};
+                    const usedCountMap = {};
+                    slots.forEach(s => {
+                        slotCountMap[s.student_email] = (slotCountMap[s.student_email] || 0) + 1;
+                        if (s.used) usedCountMap[s.student_email] = (usedCountMap[s.student_email] || 0) + 1;
+                    });
+
+                    students.forEach(s => {
+                        const row = document.createElement('tr');
+                        row.innerHTML = `
+                            <td><strong>${s.name}</strong></td>
+                            <td style="font-size:0.85rem;">${s.email}</td>
+                            <td style="text-align:center;">${slotCountMap[s.email] || 0} 枠</td>
+                            <td style="text-align:center;"><span class="status-tag status-checked-in">${usedCountMap[s.email] || 0} 人</span></td>
+                            <td style="font-size:0.85rem;">${formatDateTime(s.createdAt)}</td>
+                            <td style="white-space:nowrap;">
+                                <button class="btn btn-outline" style="font-size:0.75rem;padding:0.3rem 0.6rem;margin-right:0.3rem;" onclick="editStudent('${s.id}', '${s.name}', '${s.max_slots === null ? '' : s.max_slots}')">編集</button>
+                                <button class="btn btn-danger" style="font-size:0.75rem;padding:0.3rem 0.6rem;" onclick="deleteStudent('${s.id}', '${s.name}')">削除</button>
+                            </td>
+                        `;
+                        tbody.appendChild(row);
+                    });
+                } else {
+                    // APIがなければguest_slotsから生徒一覧を生成
+                    const { slots } = await slotsRes.json();
+                    const studentMap = {};
+                    slots.forEach(s => {
+                        if (!studentMap[s.student_email]) {
+                            studentMap[s.student_email] = { name: s.student_name, email: s.student_email, count: 0 };
+                        }
+                        studentMap[s.student_email].count++;
+                    });
+                    const students = Object.values(studentMap);
+                    tbody.innerHTML = '';
+                    if (students.length === 0) {
+                        tbody.innerHTML = '<tr><td colspan="4" style="text-align:center;">まだ招待リンクを作成した生徒はいません</td></tr>';
+                        return;
+                    }
+                    students.forEach(s => {
+                        const row = document.createElement('tr');
+                        row.innerHTML = `<td>${s.name}</td><td>${s.email}</td><td>${s.count} 枠</td><td>—</td>`;
+                        tbody.appendChild(row);
+                    });
+                }
+            } catch (e) {
+                tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;">取得エラー</td></tr>';
+                console.error(e);
+            }
+        }
+
+        async function editStudent(id, currentName, currentMaxSlots) {
+            const newName = prompt("生徒の名前を変更します:", currentName);
+            if (newName === null) return;
+            
+            const newSlots = prompt("ゲスト枠の上限数を設定します（空欄でシステムの基本設定に準拠）:", currentMaxSlots);
+            if (newSlots === null) return;
+
+            try {
+                const res = await authFetch(`${API_BASE_URL}/api/admin/students/${id}`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ name: newName, max_guest_slots: newSlots })
+                });
+                const data = await res.json();
+                showNotification(data.message, res.ok ? 'success' : 'error');
+                if (res.ok) loadStudentList();
+            } catch (e) { showNotification('更新に失敗しました。', 'error'); }
+        }
+
+        async function deleteStudent(id, name) {
+            if (!confirm(`「${name}」さんのアカウントと全ての招待スロットを削除しますか？\nこの操作は取り消せません。`)) return;
+            try {
+                const res = await authFetch(`${API_BASE_URL}/api/admin/students/${id}`, { method: 'DELETE' });
+                const data = await res.json();
+                showNotification(data.message, res.ok ? 'success' : 'error');
+                if (res.ok) loadStudentList();
+            } catch (e) { showNotification('削除に失敗しました。', 'error'); }
+        }
+
+        // === ゲスト検索 ===
+        async function searchGuests() {
+            const searchQuery = dom.searchQuery.value.trim();
+            if (!searchQuery) {
+                showNotification('検索キーワードを入力してください。', 'warning');
+                dom.searchResults.innerHTML = '';
+                return;
+            }
+
+            try {
+                const res = await authFetch(`${API_BASE_URL}/api/admin/guest-slots`);
+                if (!res.ok) throw new Error('検索に失敗しました。');
+                const { slots } = await res.json();
+                const q = searchQuery.toLowerCase();
+                const filtered = slots.filter(s =>
+                    s.guest_name.toLowerCase().includes(q) ||
+                    (s.student_name && s.student_name.toLowerCase().includes(q))
+                );
+
+                if (filtered.length === 0) {
+                    dom.searchResults.innerHTML = '<p>検索条件に一致するゲストは見つかりませんでした。</p>';
+                    return;
+                }
+
+                dom.searchResults.innerHTML = `
+                    <h3 class="section-title mt-4">検索結果</h3>
+                    <div style="overflow-x: auto;">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>ゲスト名</th>
+                                    <th>招待した生徒</th>
+                                    <th>ステータス</th>
+                                    <th>作成日時</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                ${filtered.map(s => `
+                                    <tr>
+                                        <td>${s.guest_name}</td>
+                                        <td>${s.student_name || '—'}</td>
+                                        <td><span class="status-tag ${s.used ? 'status-checked-in' : 'status-pending'}">${s.used ? '入場済み' : '未使用'}</span></td>
+                                        <td>${formatDateTime(s.createdAt)}</td>
+                                    </tr>
+                                `).join('')}
+                            </tbody>
+                        </table>
+                    </div>
+                `;
+            } catch (e) {
+                showNotification('検索に失敗しました。', 'error');
+            }
+        }
+
+
+        // === 招待コード生成 ===
+        async function downloadTemplate() {
+            try {
+                const response = await authFetch(`${API_BASE_URL}/api/download-template`, {
+                
+                });
+                if (!response.ok) throw new Error("テンプレートの取得に失敗しました");
+                const blob = await response.blob();
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement("a");
+                a.href = url;
+                a.download = "invite_code_template.csv";
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                window.URL.revokeObjectURL(url);
+            } catch (error) {
+                console.error("テンプレートDLエラー:", error);
+                showNotification("テンプレートのダウンロードに失敗しました", "error");
+            }
+        }
+
+        async function generateIndividual() {
+            const name = document.getElementById("individual-name").value.trim();
+            const prefixPart1 = dom.prefixPart1.value.trim();
+            const prefixPart2 = dom.prefixPart2.value.trim();
+
+            if (!name || !prefixPart1 || !prefixPart2) {
+                showNotification("名前とクラス情報(第1部, 第2部)はすべて必須です", "warning");
+                return;
+            }
+
+            try {
+                const response = await authFetch(`${API_BASE_URL}/api/generate-individual-invite-code`, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ name, prefixPart1, prefixPart2 })
+                });
+
+                const data = await response.json();
+                if (!response.ok) throw new Error(data.error || "エラーが発生しました");
+
+                showNotification("招待コードを生成しました", "success");
+
+                // テーブル表示
+                let tableHtml = "";
+                data.codes.forEach(c => {
+                    tableHtml += `<tr>
+                        <td style="user-select: all; font-family: monospace;">${c.code}</td>
+                        <td>${c.name}</td>
+                    </tr>`;
+                });
+                dom.generatedCodesTableBody.innerHTML = tableHtml;
+                dom.generatedCodesDisplay.classList.remove("is-hidden");
+
+            } catch (error) {
+                console.error("個別生成エラー:", error);
+                showNotification(error.message, "error");
+            }
+        }
+
+        async function uploadCsvFile() {
+            const file = dom.csvFile.files[0];
+            const prefixPart1 = dom.prefixPart1.value.trim();
+            const prefixPart2 = dom.prefixPart2.value.trim();
+
+            if (!file) {
+                showNotification("CSVファイルを選択してください。", "warning");
+                return;
+            }
+            if (!prefixPart1 || !prefixPart2) {
+                showNotification("クラス (第1部) とクラス (第2部) を入力してください。", "warning");
+                return;
+            }
+
+            const formData = new FormData();
+            formData.append("csvFile", file);
+            formData.append("prefixPart1", prefixPart1);
+            formData.append("prefixPart2", prefixPart2);
+
+            try {
+                // サーバーに送信 (既存ロジック)
+                const response = await authFetch(`${API_BASE_URL}/api/generate-invite-codes`, {
+                    method: "POST",
+                    body: formData
+                });
+
+                if (!response.ok) {
+                    const errorData = await response.json();
+                    throw new Error(errorData.error || "Unknown error occurred");
+                }
+
+                // サーバー生成CSVをBlobとして取得
+                const blob = await response.blob();
+
+                // --- ダウンロード ---
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement("a");
+                a.href = url;
+                a.download = "generated_invite_codes.csv";
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                window.URL.revokeObjectURL(url);
+
+                showNotification("招待コードが正常に生成され、ダウンロードされました。", "success");
+
+                // --- 生成結果をテーブルに表示 ---
+                const reader = new FileReader();
+                reader.onload = function (e) {
+                    const csvContent = e.target.result;
+                    displayGeneratedCodes(csvContent);
+                };
+                reader.readAsText(blob); // ←サーバー生成CSVを読み込む
+
+            } catch (error) {
+                console.error("招待コード生成エラー:", error);
+                showNotification(`招待コードの生成に失敗しました: ${error.message}`, "error");
+            }
+        }
+
+        // --- テーブル表示 ---
+        function displayGeneratedCodes(csvContent) {
+            const rows = csvContent.split(/\r\n|\n/).filter(row => row.trim() !== '');
+            let tableHtml = '';
+            rows.forEach(row => {
+                // ヘッダー行はスキップ
+                if (row.toLowerCase().startsWith('code')) return;
+                
+                // CSV行をカンマで分割 (単純な実装)
+                const parts = row.split(',');
+                const codePart = parts[0] ? parts[0].trim() : '';
+                const namePart = parts[1] ? parts[1].trim() : '';
+                
+                tableHtml += `<tr>
+                    <td style="user-select: all; font-family: monospace;">${codePart}</td>
+                    <td>${namePart}</td>
+                </tr>`;
+            });
+            dom.generatedCodesTableBody.innerHTML = tableHtml;
+            dom.generatedCodesDisplay.classList.remove('is-hidden');
+        }
+
+
+        // === ダッシュボード/レポート ===
+        async function loadDashboard() {
+            try {
+                const response = await authFetch(`${API_BASE_URL}/api/report`, {
+                
+                });
+                if (!response.ok) {
+                    throw new Error("レポートデータの取得に失敗しました。");
+                }
+                const data = await response.json();
+                updateDashboardData(data);
+                updateDashboardCharts(data);
+                showNotification("ダッシュボードを更新しました。", "info");
+            } catch (error) {
+                console.error("ダッシュボード読み込みエラー:", error);
+                showNotification("ダッシュボードの読み込みに失敗しました。", "error");
+            }
+        }
+
+        function updateDashboardData(data) {
+            dom.totalCount.textContent = data.total_reservations;
+            dom.checkedInCount.textContent = data.checked_in_count;
+            dom.pendingCount.textContent = data.pending_count;
+            dom.cancelledCount.textContent = data.cancelled_count;
+
+            const total = data.total_reservations || 1;
+            dom.checkedInPercent.textContent =
+                `${Math.round(data.checked_in_count / total * 100)}%`;
+            dom.pendingPercent.textContent =
+                `${Math.round(data.pending_count / total * 100)}%`;
+            dom.cancelledPercent.textContent =
+                `${Math.round(data.cancelled_count / total * 100)}%`;
+
+            dom.peakTime.textContent = data.peak_time || "記録なし";
+            dom.avgCheckinTime.textContent = data.avg_checkin_time || "計測不可"; // バックエンドで実装されていないため
+            dom.latestCheckin.textContent =
+                data.latest_checkin ? new Date(data.latest_checkin).toLocaleString() : "記録なし";
+            dom.checkinRate.textContent =
+                `${Math.round(data.checked_in_count / total * 100)}%`;
+            dom.cancelRate.textContent =
+                `${Math.round(data.cancelled_count / total * 100)}%`;
+            dom.remainingCount.textContent = data.pending_count;
+        }
+
+        function updateDashboardCharts(data) {
+            if (statusChart) statusChart.destroy();
+            if (hourlyChart) hourlyChart.destroy();
+            if (dailyChart) dailyChart.destroy();
+
+            statusChart = new Chart(dom.statusChartCanvas.getContext("2d"), {
+                type: "doughnut",
+                data: {
+                    labels: ["入場済み", "保留中", "キャンセル"],
+                    datasets: [{
+                        data: [data.checked_in_count, data.pending_count, data.cancelled_count],
+                        backgroundColor: [
+                            "rgba(39, 174, 96, 0.8)",
+                            "rgba(243, 156, 18, 0.8)",
+                            "rgba(231, 76, 60, 0.8)"
+                        ],
+                        borderColor: [
+                            "rgba(39, 174, 96, 1)",
+                            "rgba(243, 156, 18, 1)",
+                            "rgba(231, 76, 60, 1)"
+                        ],
+                        borderWidth: 2
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            position: "bottom",
+                            labels: {
+                                usePointStyle: true,
+                                padding: 20,
+                                font: {
+                                    family: "Noto Sans JP"
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+
+            hourlyChart = new Chart(dom.hourlyChartCanvas.getContext("2d"), {
+                type: "bar",
+                data: {
+                    labels: data.hourly_data ? data.hourly_data.map(h => `${h.hour}時`) : [],
+                    datasets: [{
+                        label: "入場者数",
+                        data: data.hourly_data ? data.hourly_data.map(h => h.count) : [],
+                        backgroundColor: "rgba(52, 152, 219, 0.8)",
+                        borderColor: "rgba(52, 152, 219, 1)",
+                        borderWidth: 1,
+                        borderRadius: 4
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            title: {
+                                display: true,
+                                text: "入場者数",
+                                font: {
+                                    family: "Noto Sans JP"
+                                }
+                            },
+                            grid: {
+                                color: "rgba(0, 0, 0, 0.05)"
+                            }
+                        },
+                        x: {
+                            title: {
+                                display: true,
+                                text: "時間帯",
+                                font: {
+                                    family: "Noto Sans JP"
+                                }
+                            },
+                            grid: {
+                                display: false
+                            }
+                        }
+                    },
+                    plugins: {
+                        legend: {
+                            display: false
+                        }
+                    }
+                }
+            });
+
+            dailyChart = new Chart(dom.dailyChartCanvas.getContext("2d"), {
+                type: "line",
+                data: {
+                    labels: data.daily_data ? data.daily_data.map(d => d.date) : [],
+                    datasets: [{
+                        label: "入場者数",
+                        data: data.daily_data ? data.daily_data.map(d => d.count) : [],
+                        backgroundColor: "rgba(52, 152, 219, 0.1)",
+                        borderColor: "rgba(52, 152, 219, 1)",
+                        borderWidth: 3,
+                        tension: 0.4,
+                        fill: true,
+                        pointBackgroundColor: "rgba(52, 152, 219, 1)",
+                        pointBorderColor: "#ffffff",
+                        pointBorderWidth: 2,
+                        pointRadius: 5,
+                        pointHoverRadius: 8
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            title: {
+                                display: true,
+                                text: "入場者数",
+                                font: {
+                                    family: "Noto Sans JP"
+                                }
+                            },
+                            grid: {
+                                color: "rgba(0, 0, 0, 0.05)"
+                            }
+                        },
+                        x: {
+                            title: {
+                                display: true,
+                                text: "日付",
+                                font: {
+                                    family: "Noto Sans JP"
+                                }
+                            },
+                            grid: {
+                                display: false
+                            }
+                        }
+                    },
+                    plugins: {
+                        legend: {
+                            display: false
+                        },
+                        tooltip: {
+                            backgroundColor: "rgba(0, 0, 0, 0.8)",
+                            titleColor: "#ffffff",
+                            bodyColor: "#ffffff",
+                            borderColor: "rgba(52, 152, 219, 1)",
+                            borderWidth: 1,
+                            callbacks: {
+                                label: function (context) {
+                                    return `入場者数: ${context.raw}人`;
+                                }
+                            }
+                        }
+                    },
+                    interaction: {
+                        intersect: false,
+                        mode: "index"
+                    }
+                }
+            });
+        }
+
+        async function exportReportData() {
+            try {
+                const response = await authFetch(`${API_BASE_URL}/api/export-report`, {
+                    method: "GET"
+                });
+                if (!response.ok) {
+                    throw new Error("レポートのエクスポートに失敗しました。");
+                }
+                const blob = await response.blob();
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement("a");
+                a.href = url;
+                const now = new Date();
+                const dateStr = `${now.getFullYear()}${(now.getMonth() + 1).toString().padStart(2, '0')}${now.getDate().toString().padStart(2, '0')}`;
+                a.download = `report_${dateStr}.csv`;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                window.URL.revokeObjectURL(url);
+                showNotification("レポートをエクスポートしました。", "success");
+            } catch (error) {
+                console.error("レポートエクスポートエラー:", error);
+                showNotification("レポートのエクスポートに失敗しました。", "error");
+            }
+        }
+
+        // === 自動更新 ===
+        function startAutoRefresh() {
+            stopAutoRefresh(); // 既存のインターバルをクリア
+            if (dom.autoRefreshCheckbox.checked) {
+                autoRefreshIntervalId = setInterval(() => {
+                    const activeTab = dom.tabList.querySelector(".tab-item.is-active");
+                    if (activeTab && activeTab.dataset.target === "tab-report") {
+                        loadDashboard();
+                    } else if (activeTab && activeTab.dataset.target === "tab-reservations") {
+                        updateReservations();
+                    }
+                }, 30000); // 30秒ごとに更新
+            }
+        }
+
+        function stopAutoRefresh() {
+            if (autoRefreshIntervalId) {
+                clearInterval(autoRefreshIntervalId);
+                autoRefreshIntervalId = null;
+            }
+        }
+
+    </script>
+</body>
+
+</html>

@@ -1,0 +1,519 @@
+{
+  "users": [
+    {
+      "username": "admin",
+      "password": "$2b$10$jSmxQI95ZJOrZq1eBCv2HOy7o1rTW6wZcPeEA.I8g1FD9Vr6eGdvi",
+      "role": "admin",
+      "id": 1,
+      "createdAt": "2026-01-17T08:10:35.721Z",
+      "updatedAt": "2026-01-17T08:10:35.722Z"
+    }
+  ],
+  "invite_codes": [
+    {
+      "code": "1-9-越川颯人-保護者-808608de",
+      "used": true,
+      "name": "越川颯人",
+      "id": 1,
+      "createdAt": "2026-01-17T08:27:00.387Z",
+      "updatedAt": "2026-01-17T08:50:55.028Z"
+    },
+    {
+      "code": "1-9-越川颯人-ゲスト-d4c0ed45",
+      "used": true,
+      "name": "越川颯人",
+      "id": 2,
+      "createdAt": "2026-01-17T08:27:00.387Z",
+      "updatedAt": "2026-01-17T08:51:35.429Z"
+    },
+    {
+      "code": "1-9-越川颯人-ゲスト-efefc4c7",
+      "used": false,
+      "name": "越川颯人",
+      "id": 3,
+      "createdAt": "2026-01-17T08:27:00.387Z",
+      "updatedAt": "2026-01-17T08:27:00.387Z"
+    },
+    {
+      "code": "1-9-越川颯人-ゲスト-4486248d",
+      "used": false,
+      "name": "越川颯人",
+      "id": 4,
+      "createdAt": "2026-01-17T08:27:00.387Z",
+      "updatedAt": "2026-01-17T08:27:00.387Z"
+    },
+    {
+      "code": "2-9-越川颯人-保護者-a5057691",
+      "used": false,
+      "name": "越川颯人",
+      "id": 5,
+      "createdAt": "2026-01-17T08:30:01.040Z",
+      "updatedAt": "2026-01-17T08:30:01.040Z"
+    },
+    {
+      "code": "2-9-越川颯人-ゲスト-7da45e65",
+      "used": false,
+      "name": "越川颯人",
+      "id": 6,
+      "createdAt": "2026-01-17T08:30:01.040Z",
+      "updatedAt": "2026-01-17T08:30:01.040Z"
+    },
+    {
+      "code": "2-9-越川颯人-ゲスト-dd298afb",
+      "used": false,
+      "name": "越川颯人",
+      "id": 7,
+      "createdAt": "2026-01-17T08:30:01.040Z",
+      "updatedAt": "2026-01-17T08:30:01.040Z"
+    },
+    {
+      "code": "2-9-越川颯人-ゲスト-a38c0bac",
+      "used": false,
+      "name": "越川颯人",
+      "id": 8,
+      "createdAt": "2026-01-17T08:30:01.040Z",
+      "updatedAt": "2026-01-17T08:30:01.040Z"
+    },
+    {
+      "code": "2-9-ｓｗ-保護者-1fc323d7",
+      "used": false,
+      "name": "ｓｗ",
+      "id": 9,
+      "createdAt": "2026-01-17T08:30:24.465Z",
+      "updatedAt": "2026-01-17T08:48:26.593Z"
+    },
+    {
+      "code": "2-9-ｓｗ-ゲスト-79cf5939",
+      "used": false,
+      "name": "ｓｗ",
+      "id": 10,
+      "createdAt": "2026-01-17T08:30:24.465Z",
+      "updatedAt": "2026-01-17T08:30:24.465Z"
+    },
+    {
+      "code": "2-9-ｓｗ-ゲスト-34e956a1",
+      "used": false,
+      "name": "ｓｗ",
+      "id": 11,
+      "createdAt": "2026-01-17T08:30:24.465Z",
+      "updatedAt": "2026-01-17T08:30:24.465Z"
+    },
+    {
+      "code": "2-9-ｓｗ-ゲスト-f1f0f5dc",
+      "used": false,
+      "name": "ｓｗ",
+      "id": 12,
+      "createdAt": "2026-01-17T08:30:24.465Z",
+      "updatedAt": "2026-01-17T08:30:24.465Z"
+    },
+    {
+      "code": "2-9-ssd-保護者-148c5e04",
+      "used": false,
+      "name": "ssd",
+      "id": 13,
+      "createdAt": "2026-01-17T08:50:09.772Z",
+      "updatedAt": "2026-01-17T08:50:09.772Z"
+    },
+    {
+      "code": "2-9-ssd-ゲスト-04641611",
+      "used": false,
+      "name": "ssd",
+      "id": 14,
+      "createdAt": "2026-01-17T08:50:09.772Z",
+      "updatedAt": "2026-01-17T08:50:09.772Z"
+    },
+    {
+      "code": "2-9-ssd-ゲスト-89267819",
+      "used": false,
+      "name": "ssd",
+      "id": 15,
+      "createdAt": "2026-01-17T08:50:09.772Z",
+      "updatedAt": "2026-01-17T08:50:09.772Z"
+    },
+    {
+      "code": "2-9-ssd-ゲスト-447988c7",
+      "used": false,
+      "name": "ssd",
+      "id": 16,
+      "createdAt": "2026-01-17T08:50:09.772Z",
+      "updatedAt": "2026-01-17T08:50:09.772Z"
+    },
+    {
+      "code": "1-9-ssd-保護者-33e28720",
+      "used": false,
+      "name": "ssd",
+      "id": 17,
+      "createdAt": "2026-01-17T09:00:41.168Z",
+      "updatedAt": "2026-01-17T09:00:41.168Z"
+    },
+    {
+      "code": "1-9-ssd-ゲスト-de408b4d",
+      "used": false,
+      "name": "ssd",
+      "id": 18,
+      "createdAt": "2026-01-17T09:00:41.168Z",
+      "updatedAt": "2026-01-17T09:00:41.168Z"
+    },
+    {
+      "code": "1-9-ssd-ゲスト-90b32e1f",
+      "used": false,
+      "name": "ssd",
+      "id": 19,
+      "createdAt": "2026-01-17T09:00:41.168Z",
+      "updatedAt": "2026-01-17T09:00:41.168Z"
+    },
+    {
+      "code": "1-9-ssd-ゲスト-6b449451",
+      "used": false,
+      "name": "ssd",
+      "id": 20,
+      "createdAt": "2026-01-17T09:00:41.168Z",
+      "updatedAt": "2026-01-17T09:00:41.168Z"
+    },
+    {
+      "code": "3-A-テスト太郎-保護者-78870e1d",
+      "used": false,
+      "name": "テスト太郎",
+      "id": 21,
+      "createdAt": "2026-03-24T13:35:52.554Z",
+      "updatedAt": "2026-03-24T13:35:52.554Z"
+    },
+    {
+      "code": "3-A-テスト太郎-ゲスト-2967b770",
+      "used": false,
+      "name": "テスト太郎",
+      "id": 22,
+      "createdAt": "2026-03-24T13:35:52.554Z",
+      "updatedAt": "2026-03-24T13:35:52.554Z"
+    },
+    {
+      "code": "3-A-テスト太郎-ゲスト-fc94d1d3",
+      "used": false,
+      "name": "テスト太郎",
+      "id": 23,
+      "createdAt": "2026-03-24T13:35:52.554Z",
+      "updatedAt": "2026-03-24T13:35:52.554Z"
+    },
+    {
+      "code": "3-A-テスト太郎-ゲスト-6b8ebf97",
+      "used": false,
+      "name": "テスト太郎",
+      "id": 24,
+      "createdAt": "2026-03-24T13:35:52.554Z",
+      "updatedAt": "2026-03-24T13:35:52.554Z"
+    },
+    {
+      "code": "3-B-Test User-保護者-36f9315f",
+      "used": false,
+      "name": "Test User",
+      "id": 25,
+      "createdAt": "2026-03-24T13:38:00.067Z",
+      "updatedAt": "2026-03-24T13:38:00.067Z"
+    },
+    {
+      "code": "3-B-Test User-ゲスト-2607e5af",
+      "used": true,
+      "name": "Test User",
+      "id": 26,
+      "createdAt": "2026-03-24T13:38:00.067Z",
+      "updatedAt": "2026-03-24T13:39:39.677Z"
+    },
+    {
+      "code": "3-B-Test User-ゲスト-08adf1d8",
+      "used": false,
+      "name": "Test User",
+      "id": 27,
+      "createdAt": "2026-03-24T13:38:00.067Z",
+      "updatedAt": "2026-03-24T13:38:00.067Z"
+    },
+    {
+      "code": "3-B-Test User-ゲスト-3d504171",
+      "used": false,
+      "name": "Test User",
+      "id": 28,
+      "createdAt": "2026-03-24T13:38:00.067Z",
+      "updatedAt": "2026-03-24T13:38:00.067Z"
+    },
+    {
+      "code": "2-9-ssd-保護者-db2fc972",
+      "used": false,
+      "name": "ssd",
+      "id": 29,
+      "createdAt": "2026-03-25T06:09:25.517Z",
+      "updatedAt": "2026-03-25T06:09:25.517Z"
+    },
+    {
+      "code": "2-9-ssd-ゲスト-c17c23fe",
+      "used": false,
+      "name": "ssd",
+      "id": 30,
+      "createdAt": "2026-03-25T06:09:25.517Z",
+      "updatedAt": "2026-03-25T06:09:25.517Z"
+    },
+    {
+      "code": "2-9-ssd-ゲスト-854b1f57",
+      "used": false,
+      "name": "ssd",
+      "id": 31,
+      "createdAt": "2026-03-25T06:09:25.517Z",
+      "updatedAt": "2026-03-25T06:09:25.517Z"
+    },
+    {
+      "code": "2-9-ssd-ゲスト-18d64e55",
+      "used": false,
+      "name": "ssd",
+      "id": 32,
+      "createdAt": "2026-03-25T06:09:25.517Z",
+      "updatedAt": "2026-03-25T06:09:25.517Z"
+    },
+    {
+      "code": "2-9-ssd-保護者-7979d52f",
+      "used": false,
+      "name": "ssd",
+      "id": 33,
+      "createdAt": "2026-03-27T02:05:46.322Z",
+      "updatedAt": "2026-03-27T02:05:46.322Z"
+    },
+    {
+      "code": "2-9-ssd-ゲスト-33390f43",
+      "used": false,
+      "name": "ssd",
+      "id": 34,
+      "createdAt": "2026-03-27T02:05:46.322Z",
+      "updatedAt": "2026-03-27T02:05:46.322Z"
+    },
+    {
+      "code": "2-9-ssd-ゲスト-618082dc",
+      "used": false,
+      "name": "ssd",
+      "id": 35,
+      "createdAt": "2026-03-27T02:05:46.322Z",
+      "updatedAt": "2026-03-27T02:05:46.322Z"
+    },
+    {
+      "code": "2-9-ssd-ゲスト-271dc802",
+      "used": false,
+      "name": "ssd",
+      "id": 36,
+      "createdAt": "2026-03-27T02:05:46.322Z",
+      "updatedAt": "2026-03-27T02:05:46.322Z"
+    },
+    {
+      "code": "2-9-ssd-保護者-e10a6f68",
+      "used": false,
+      "name": "ssd",
+      "id": 37,
+      "createdAt": "2026-03-27T02:12:50.415Z",
+      "updatedAt": "2026-03-27T02:12:50.415Z"
+    },
+    {
+      "code": "2-9-ssd-ゲスト-49f923e2",
+      "used": false,
+      "name": "ssd",
+      "id": 38,
+      "createdAt": "2026-03-27T02:12:50.415Z",
+      "updatedAt": "2026-03-27T02:12:50.415Z"
+    },
+    {
+      "code": "2-9-ssd-ゲスト-f31d1adb",
+      "used": false,
+      "name": "ssd",
+      "id": 39,
+      "createdAt": "2026-03-27T02:12:50.415Z",
+      "updatedAt": "2026-03-27T02:12:50.415Z"
+    },
+    {
+      "code": "2-9-ssd-ゲスト-ee6b3127",
+      "used": false,
+      "name": "ssd",
+      "id": 40,
+      "createdAt": "2026-03-27T02:12:50.415Z",
+      "updatedAt": "2026-03-27T02:12:50.415Z"
+    },
+    {
+      "code": "2-9-ssd-保護者-3c67d3a2",
+      "used": false,
+      "name": "ssd",
+      "id": 41,
+      "createdAt": "2026-03-27T02:14:03.181Z",
+      "updatedAt": "2026-03-27T02:14:03.181Z"
+    },
+    {
+      "code": "2-9-ssd-ゲスト-a098e6c4",
+      "used": false,
+      "name": "ssd",
+      "id": 42,
+      "createdAt": "2026-03-27T02:14:03.181Z",
+      "updatedAt": "2026-03-27T02:14:03.181Z"
+    },
+    {
+      "code": "2-9-ssd-ゲスト-bc8b81c4",
+      "used": false,
+      "name": "ssd",
+      "id": 43,
+      "createdAt": "2026-03-27T02:14:03.181Z",
+      "updatedAt": "2026-03-27T02:14:03.181Z"
+    },
+    {
+      "code": "2-9-ssd-ゲスト-f91fba71",
+      "used": false,
+      "name": "ssd",
+      "id": 44,
+      "createdAt": "2026-03-27T02:14:03.181Z",
+      "updatedAt": "2026-03-27T02:14:03.182Z"
+    },
+    {
+      "code": "2-9-ssd-保護者-9404d36a",
+      "used": false,
+      "name": "ssd",
+      "id": 45,
+      "createdAt": "2026-03-27T02:22:04.508Z",
+      "updatedAt": "2026-03-27T02:23:45.460Z"
+    },
+    {
+      "code": "2-9-ssd-ゲスト-beb11d9a",
+      "used": false,
+      "name": "ssd",
+      "id": 46,
+      "createdAt": "2026-03-27T02:22:04.508Z",
+      "updatedAt": "2026-03-27T02:22:04.508Z"
+    },
+    {
+      "code": "2-9-ssd-ゲスト-ae17a670",
+      "used": false,
+      "name": "ssd",
+      "id": 47,
+      "createdAt": "2026-03-27T02:22:04.508Z",
+      "updatedAt": "2026-03-27T02:22:04.508Z"
+    },
+    {
+      "code": "2-9-ssd-ゲスト-c0d64b5b",
+      "used": false,
+      "name": "ssd",
+      "id": 48,
+      "createdAt": "2026-03-27T02:22:04.508Z",
+      "updatedAt": "2026-03-27T02:22:04.508Z"
+    },
+    {
+      "code": "1-9-ssd-保護者-97c662cd",
+      "used": false,
+      "name": "ssd",
+      "id": 49,
+      "createdAt": "2026-03-27T02:24:29.082Z",
+      "updatedAt": "2026-03-27T02:24:29.082Z"
+    },
+    {
+      "code": "1-9-ssd-ゲスト-f22b94e4",
+      "used": false,
+      "name": "ssd",
+      "id": 50,
+      "createdAt": "2026-03-27T02:24:29.082Z",
+      "updatedAt": "2026-03-27T02:24:29.082Z"
+    },
+    {
+      "code": "1-9-ssd-ゲスト-f0ddc541",
+      "used": false,
+      "name": "ssd",
+      "id": 51,
+      "createdAt": "2026-03-27T02:24:29.082Z",
+      "updatedAt": "2026-03-27T02:24:29.082Z"
+    },
+    {
+      "code": "1-9-ssd-ゲスト-6deaaf76",
+      "used": false,
+      "name": "ssd",
+      "id": 52,
+      "createdAt": "2026-03-27T02:24:29.082Z",
+      "updatedAt": "2026-03-27T02:24:29.082Z"
+    }
+  ],
+  "reservations": [
+    {
+      "id": 591824,
+      "name": "hato",
+      "contact": "hato2008125@gmail.com",
+      "relationship": "3",
+      "invite_code": "1-9-越川颯人-保護者-808608de",
+      "createdAt": "2026-01-17T08:50:55.027Z",
+      "updatedAt": "2026-01-17T08:50:55.027Z",
+      "status": "pending"
+    },
+    {
+      "id": 563841,
+      "name": "hato",
+      "contact": "hato2008125@gmail.com",
+      "relationship": "1",
+      "invite_code": "1-9-越川颯人-ゲスト-d4c0ed45",
+      "createdAt": "2026-01-17T08:51:35.428Z",
+      "updatedAt": "2026-01-17T08:51:35.428Z",
+      "status": "pending"
+    },
+    {
+      "id": 847134,
+      "name": "Test Guest",
+      "contact": "test@example.com",
+      "relationship": "2",
+      "invite_code": "3-B-Test User-ゲスト-2607e5af",
+      "createdAt": "2026-03-24T13:39:39.676Z",
+      "updatedAt": "2026-03-24T13:40:11.942Z",
+      "status": "checked-in"
+    },
+    {
+      "id": 430258,
+      "name": "越川颯人",
+      "contact": "hato2008125@gmail.com",
+      "relationship": "3",
+      "invite_code": "2-9-ssd-保護者-9404d36a",
+      "status": "checked-in",
+      "createdAt": "2026-03-27T02:22:15.561Z",
+      "updatedAt": "2026-03-27T02:23:55.971Z"
+    }
+  ],
+  "students": [
+    {
+      "email": "g2024172@biblos.ac.jp",
+      "name": "越川颯人",
+      "otp": null,
+      "otp_expires_at": null,
+      "id": "5a46e3302b549fa8",
+      "createdAt": "2026-03-27T02:58:42.313Z",
+      "updatedAt": "2026-03-29T14:15:22.276Z",
+      "max_guest_slots": null
+    }
+  ],
+  "guest_slots": [
+    {
+      "id": "42e2adf6326954f0",
+      "token": "0b4d5cd94142919228e80db702e1fbf044830feca5bbf25d",
+      "student_email": "g2024172@biblos.ac.jp",
+      "student_name": "越川",
+      "guest_name": "早棚",
+      "used": false,
+      "createdAt": "2026-03-27T02:59:12.420Z",
+      "updatedAt": "2026-03-27T11:11:44.692Z",
+      "checked_in_at": null
+    },
+    {
+      "id": "6938b9c9b3ab5e79",
+      "token": "22c282f0fdecba2971c8093b9182398bb125a15253ab28a6",
+      "student_email": "g2024172@biblos.ac.jp",
+      "student_name": "越川颯人",
+      "guest_name": "HAYATO KOSHIKAWA",
+      "used": false,
+      "createdAt": "2026-03-27T03:04:17.395Z",
+      "updatedAt": "2026-03-29T14:14:30.048Z",
+      "checked_in_at": null
+    },
+    {
+      "id": "c8d24ea8495ad04c",
+      "token": "2771035c9fde130ae85a76c9beb43d999908368993b0eea1",
+      "student_email": "g2024172@biblos.ac.jp",
+      "student_name": "越川颯人",
+      "guest_name": "池上しょう",
+      "used": true,
+      "createdAt": "2026-03-27T11:17:36.168Z",
+      "updatedAt": "2026-03-27T11:18:15.387Z",
+      "checked_in_at": "2026-03-27T11:18:15.386Z"
+    }
+  ]
+}

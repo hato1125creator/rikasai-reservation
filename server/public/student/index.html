@@ -1,0 +1,486 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>梨花祭2025 生徒ダッシュボード</title>
+    <link rel="stylesheet" href="/css/style.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        .tab-bar {
+            display: flex;
+            background: var(--color-bg);
+            border-radius: var(--radius-md);
+            padding: 4px;
+            margin-bottom: 1.5rem;
+            gap: 4px;
+        }
+        .tab-btn {
+            flex: 1;
+            padding: 0.55rem 0;
+            border: none;
+            border-radius: calc(var(--radius-md) - 4px);
+            font-size: 0.9rem;
+            font-weight: 600;
+            cursor: pointer;
+            background: transparent;
+            color: var(--color-text-sub);
+            transition: background 0.2s, color 0.2s;
+        }
+        .tab-btn.active {
+            background: var(--color-primary);
+            color: #fff;
+        }
+        .slot-card {
+            background: var(--color-bg);
+            border-radius: var(--radius-md);
+            padding: 1rem 1.25rem;
+            margin-bottom: 0.75rem;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 0.75rem;
+        }
+        .slot-info { flex: 1; text-align: left; }
+        .slot-name { font-weight: 700; font-size: 1rem; margin-bottom: 0.25rem; }
+        .slot-status { font-size: 0.8rem; }
+        .slot-status.used { color: var(--color-error); }
+        .slot-status.unused { color: var(--color-success); }
+        .btn-copy {
+            padding: 0.4rem 0.85rem;
+            font-size: 0.8rem;
+            border-radius: var(--radius-sm);
+            border: 1px solid var(--color-primary);
+            background: transparent;
+            color: var(--color-primary);
+            cursor: pointer;
+            white-space: nowrap;
+            transition: background 0.2s, color 0.2s;
+        }
+        .btn-copy:hover { background: var(--color-primary); color: #fff; }
+        .btn-copy.copied { background: var(--color-success); border-color: var(--color-success); color: #fff; }
+        .count-badge {
+            display: inline-block;
+            background: var(--color-primary);
+            color: #fff;
+            border-radius: 50px;
+            padding: 0.2rem 0.75rem;
+            font-size: 0.85rem;
+            font-weight: 600;
+            margin-bottom: 1.25rem;
+        }
+        .add-guest-form {
+            background: var(--color-bg);
+            border-radius: var(--radius-md);
+            padding: 1.25rem;
+            margin-bottom: 1.25rem;
+            text-align: left;
+        }
+        .add-guest-form input { width: 100%; margin-bottom: 0.75rem; }
+    </style>
+</head>
+<body class="landing-page">
+    <div class="glass-card slide-up" style="max-width: 500px; margin: 0 auto;">
+
+        <!-- ===== ログイン画面 ===== -->
+        <div id="page-login">
+            <h1 class="title">梨花祭2025</h1>
+            <p class="subtitle">生徒ダッシュボード</p>
+
+            <!-- タブ切り替え -->
+            <div class="tab-bar">
+                <button class="tab-btn active" id="tab-login" onclick="switchTab('login')">ログイン</button>
+                <button class="tab-btn" id="tab-register" onclick="switchTab('register')">新規登録</button>
+            </div>
+
+            <!-- ログインフォーム（メールのみ） -->
+            <div id="form-login" class="fade-in">
+                <div class="form-group">
+                    <label class="form-label" for="login-email">学校メールアドレス</label>
+                    <input class="form-input" type="email" id="login-email" placeholder="xxxx@biblos.ac.jp" autocomplete="email">
+                </div>
+                <p id="login-error" class="help is-danger" style="display:none;"></p>
+                <button class="btn btn-primary" style="width:100%;" onclick="sendLoginOtp()">認証コードを送信</button>
+            </div>
+
+            <!-- 新規登録フォーム（メール+名前） -->
+            <div id="form-register" class="fade-in" style="display:none;">
+                <div class="form-group">
+                    <label class="form-label" for="reg-email">学校メールアドレス</label>
+                    <input class="form-input" type="email" id="reg-email" placeholder="xxxx@biblos.ac.jp" autocomplete="email">
+                </div>
+                <div class="form-group">
+                    <label class="form-label" for="reg-name">氏名</label>
+                    <input class="form-input" type="text" id="reg-name" placeholder="例: 山田 太郎">
+                </div>
+                <p id="register-error" class="help is-danger" style="display:none;"></p>
+                <button class="btn btn-primary" style="width:100%;" onclick="sendRegisterOtp()">認証コードを送信</button>
+            </div>
+
+            <!-- OTP入力（共通） -->
+            <div id="step-otp" class="fade-in" style="display:none;">
+                <p style="margin-bottom: 1rem; color: var(--color-text-sub);">
+                    <span id="otp-email-display" style="font-weight:700;"></span> に<br>6桁の認証コードを送信しました。
+                </p>
+                <div class="form-group">
+                    <label class="form-label" for="input-otp">認証コード（6桁）</label>
+                    <input class="form-input" type="text" id="input-otp" placeholder="123456" maxlength="6" inputmode="numeric">
+                </div>
+                <p id="otp-error" class="help is-danger" style="display:none;"></p>
+                <div style="display:flex; gap:0.75rem;">
+                    <button class="btn" style="flex:1; background: var(--color-bg); color: var(--color-text);" onclick="backToForm()">戻る</button>
+                    <button class="btn btn-primary" style="flex:2;" onclick="verifyOtp()">ログイン</button>
+                </div>
+            </div>
+
+            <!-- 処理中インジケーター -->
+            <div id="step-loading" style="display:none; text-align:center; padding: 1rem 0;">
+                <div class="loader" style="margin: 0 auto 1rem;"></div>
+                <p style="color: var(--color-text-sub); font-size:0.9rem;">処理中...</p>
+            </div>
+        </div>
+
+        <!-- ===== ダッシュボード ===== -->
+        <div id="page-dashboard" style="display:none;">
+            <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:1.25rem;">
+                <div>
+                    <h1 class="title" style="font-size: 1.4rem; margin:0;">梨花祭2025</h1>
+                    <p id="dash-name" style="color: var(--color-text-sub); margin:0; font-size:0.9rem;"></p>
+                </div>
+                <button class="btn" style="padding: 0.4rem 0.85rem; font-size:0.8rem; background: var(--color-bg); color: var(--color-text-sub);" onclick="logout()">ログアウト</button>
+            </div>
+
+            <p class="subtitle" style="text-align:left; margin-bottom: 0.5rem;">招待リンク管理</p>
+            <p id="dash-count-label" class="count-badge"></p>
+
+            <div id="slots-container"></div>
+
+            <div id="add-guest-section">
+                <div class="add-guest-form">
+                    <label class="form-label" for="input-guest-name">ゲストの名前を入力して招待リンクを作成</label>
+                    <input class="form-input" type="text" id="input-guest-name" placeholder="例: 鈴木 花子">
+                    <p id="add-error" class="help is-danger" style="display:none;"></p>
+                    <button class="btn btn-primary" style="width:100%;" id="btn-add-guest" onclick="addGuest()">招待リンクを生成</button>
+                </div>
+            </div>
+
+            <p id="limit-notice" style="display:none; color: var(--color-text-sub); font-size:0.85rem; margin-top:0.5rem;">
+                招待枠をすべて使用しました。
+            </p>
+
+            <p style="margin-top: 1.5rem; font-size: 0.8rem; color: var(--color-text-sub);">
+                ※ 招待リンクをゲストに送ってください。ゲストはリンクを開くだけで入場QRが表示されます。
+            </p>
+        </div>
+
+    </div>
+
+    <script>
+        let studentToken = localStorage.getItem('student_token') || '';
+        let studentEmail = localStorage.getItem('student_email') || '';
+        let maxSlots = 3;
+        let currentTab = 'login'; // 'login' | 'register'
+
+        // ===== 初期化 =====
+        window.addEventListener('DOMContentLoaded', () => {
+            if (studentToken) loadDashboard();
+        });
+
+        // ===== タブ切り替え =====
+        function switchTab(tab) {
+            currentTab = tab;
+            document.getElementById('tab-login').classList.toggle('active', tab === 'login');
+            document.getElementById('tab-register').classList.toggle('active', tab === 'register');
+            document.getElementById('form-login').style.display = tab === 'login' ? 'block' : 'none';
+            document.getElementById('form-register').style.display = tab === 'register' ? 'block' : 'none';
+            clearErrors();
+        }
+
+        function clearErrors() {
+            ['login-error', 'register-error', 'otp-error'].forEach(id => {
+                const el = document.getElementById(id);
+                if (el) { el.style.display = 'none'; el.textContent = ''; }
+            });
+        }
+
+        // ===== ログイン（メールのみ）=====
+        async function sendLoginOtp() {
+            const email = document.getElementById('login-email').value.trim();
+            const errEl = document.getElementById('login-error');
+            errEl.style.display = 'none';
+
+            if (!email) {
+                errEl.textContent = 'メールアドレスを入力してください。';
+                errEl.style.display = 'block';
+                return;
+            }
+
+            setLoading(true);
+            try {
+                const res = await fetch('/api/student/login-otp', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ email })
+                });
+                const data = await res.json();
+                setLoading(false);
+
+                if (res.ok) {
+                    studentEmail = email;
+                    document.getElementById('otp-email-display').textContent = email;
+                    showOtpStep();
+                } else {
+                    errEl.textContent = data.message || 'エラーが発生しました。';
+                    errEl.style.display = 'block';
+                }
+            } catch (e) {
+                setLoading(false);
+                errEl.textContent = 'サーバーとの通信に失敗しました。';
+                errEl.style.display = 'block';
+            }
+        }
+
+        // ===== 新規登録（メール+名前）=====
+        async function sendRegisterOtp() {
+            const email = document.getElementById('reg-email').value.trim();
+            const name = document.getElementById('reg-name').value.trim();
+            const errEl = document.getElementById('register-error');
+            errEl.style.display = 'none';
+
+            if (!email || !name) {
+                errEl.textContent = 'メールアドレスと氏名を入力してください。';
+                errEl.style.display = 'block';
+                return;
+            }
+
+            setLoading(true);
+            try {
+                const res = await fetch('/api/student/request-otp', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ email, name })
+                });
+                const data = await res.json();
+                setLoading(false);
+
+                if (res.ok) {
+                    studentEmail = email;
+                    document.getElementById('otp-email-display').textContent = email;
+                    showOtpStep();
+                } else {
+                    errEl.textContent = data.message || 'エラーが発生しました。';
+                    errEl.style.display = 'block';
+                }
+            } catch (e) {
+                setLoading(false);
+                errEl.textContent = 'サーバーとの通信に失敗しました。';
+                errEl.style.display = 'block';
+            }
+        }
+
+        function showOtpStep() {
+            document.getElementById('form-login').style.display = 'none';
+            document.getElementById('form-register').style.display = 'none';
+            document.getElementById('tab-bar') && (document.querySelector('.tab-bar').style.display = 'none');
+            document.getElementById('step-otp').style.display = 'block';
+        }
+
+        // ===== OTP検証 =====
+        async function verifyOtp() {
+            const otp = document.getElementById('input-otp').value.trim();
+            const errEl = document.getElementById('otp-error');
+            errEl.style.display = 'none';
+
+            if (!otp || otp.length !== 6) {
+                errEl.textContent = '6桁の認証コードを入力してください。';
+                errEl.style.display = 'block';
+                return;
+            }
+
+            setLoading(true);
+            try {
+                const res = await fetch('/api/student/verify-otp', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ email: studentEmail, otp })
+                });
+                const data = await res.json();
+                setLoading(false);
+
+                if (res.ok && data.success) {
+                    studentToken = data.token;
+                    localStorage.setItem('student_token', studentToken);
+                    localStorage.setItem('student_email', studentEmail);
+                    loadDashboard();
+                } else {
+                    errEl.textContent = data.message || '認証に失敗しました。';
+                    errEl.style.display = 'block';
+                }
+            } catch (e) {
+                setLoading(false);
+                errEl.textContent = 'サーバーとの通信に失敗しました。';
+                errEl.style.display = 'block';
+            }
+        }
+
+        // ===== ダッシュボード読み込み =====
+        async function loadDashboard() {
+            try {
+                const res = await fetch('/api/student/dashboard', {
+                    headers: { 'Authorization': `Bearer ${studentToken}` }
+                });
+                if (res.status === 401 || res.status === 403) { logout(); return; }
+                const data = await res.json();
+                maxSlots = data.maxSlots || 3;
+
+                document.getElementById('page-login').style.display = 'none';
+                document.getElementById('page-dashboard').style.display = 'block';
+                document.getElementById('dash-name').textContent = `${data.name} さん`;
+                renderSlots(data.slots);
+            } catch (e) {
+                console.error('ダッシュボード読み込みエラー:', e);
+                logout();
+            }
+        }
+
+        function renderSlots(slots) {
+            const container = document.getElementById('slots-container');
+            const addSection = document.getElementById('add-guest-section');
+            const limitNotice = document.getElementById('limit-notice');
+            const countLabel = document.getElementById('dash-count-label');
+            const baseUrl = `${location.protocol}//${location.host}`;
+
+            countLabel.textContent = `${slots.length} / ${maxSlots} 枠使用中`;
+            container.innerHTML = '';
+
+            if (slots.length === 0) {
+                container.innerHTML = '<p style="color: var(--color-text-sub); font-size: 0.9rem; margin-bottom: 1rem;">まだ招待リンクはありません。</p>';
+            }
+
+            slots.forEach((slot, i) => {
+                const url = `${baseUrl}/?token=${slot.token}`;
+                const div = document.createElement('div');
+                div.className = 'slot-card';
+                div.innerHTML = `
+                    <div class="slot-info">
+                        <div class="slot-name">${escHtml(slot.guest_name)}</div>
+                        <div class="slot-status ${slot.used ? 'used' : 'unused'}">
+                            ${slot.used ? '✅ 使用済み' : '⬜ 未使用'}
+                        </div>
+                    </div>
+                    ${!slot.used
+                        ? `<button class="btn-copy" id="copy-btn-${i}" onclick="copyLink('${escHtml(url)}', ${i})">コピー</button>`
+                        : '<span style="font-size:0.8rem; color: var(--color-text-sub);">入場済み</span>'
+                    }
+                `;
+                container.appendChild(div);
+            });
+
+            if (slots.length >= maxSlots) {
+                addSection.style.display = 'none';
+                limitNotice.style.display = 'block';
+            } else {
+                addSection.style.display = 'block';
+                limitNotice.style.display = 'none';
+            }
+        }
+
+        // ===== 招待リンク生成 =====
+        async function addGuest() {
+            const guestName = document.getElementById('input-guest-name').value.trim();
+            const errEl = document.getElementById('add-error');
+            errEl.style.display = 'none';
+
+            if (!guestName) {
+                errEl.textContent = 'ゲストの名前を入力してください。';
+                errEl.style.display = 'block';
+                return;
+            }
+
+            const btn = document.getElementById('btn-add-guest');
+            btn.disabled = true;
+            btn.textContent = '生成中...';
+
+            try {
+                const res = await fetch('/api/student/generate-links', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${studentToken}`
+                    },
+                    body: JSON.stringify({ guest_name: guestName })
+                });
+                const data = await res.json();
+
+                if (res.ok) {
+                    document.getElementById('input-guest-name').value = '';
+                    await loadDashboard();
+                } else {
+                    errEl.textContent = data.message || '生成に失敗しました。';
+                    errEl.style.display = 'block';
+                }
+            } catch (e) {
+                errEl.textContent = 'サーバーとの通信に失敗しました。';
+                errEl.style.display = 'block';
+            } finally {
+                btn.disabled = false;
+                btn.textContent = '招待リンクを生成';
+            }
+        }
+
+        // ===== コピー =====
+        async function copyLink(url, idx) {
+            try {
+                await navigator.clipboard.writeText(url);
+                const btn = document.getElementById(`copy-btn-${idx}`);
+                if (btn) {
+                    btn.textContent = 'コピー済み！';
+                    btn.classList.add('copied');
+                    setTimeout(() => { btn.textContent = 'コピー'; btn.classList.remove('copied'); }, 2000);
+                }
+            } catch (e) {
+                prompt('URLをコピーしてください:', url);
+            }
+        }
+
+        // ===== ユーティリティ =====
+        function backToForm() {
+            document.getElementById('step-otp').style.display = 'none';
+            document.querySelector('.tab-bar').style.display = 'flex';
+            switchTab(currentTab);
+        }
+
+        function setLoading(on) {
+            document.getElementById('step-loading').style.display = on ? 'block' : 'none';
+            if (on) {
+                document.getElementById('form-login').style.display = 'none';
+                document.getElementById('form-register').style.display = 'none';
+                document.getElementById('step-otp').style.display = 'none';
+            }
+        }
+
+        function logout() {
+            localStorage.removeItem('student_token');
+            localStorage.removeItem('student_email');
+            studentToken = '';
+            document.getElementById('page-dashboard').style.display = 'none';
+            document.getElementById('page-login').style.display = 'block';
+            document.querySelector('.tab-bar').style.display = 'flex';
+            switchTab('login');
+            setLoading(false);
+        }
+
+        function escHtml(str) {
+            return String(str)
+                .replace(/&/g, '&amp;').replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;').replace(/"/g, '&quot;')
+                .replace(/'/g, '&#039;');
+        }
+    </script>
+
+    <footer style="text-align: center; margin-top: 2rem; padding: 1rem;">
+        <p style="color: var(--color-text-sub); font-size: 12px;">&copy; 2025 千葉英和高校梨花祭運営委員</p>
+    </footer>
+</body>
+</html>

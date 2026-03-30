@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="ja">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>梨花祭2025 入場QR</title>
+    <link rel="stylesheet" href="/css/style.css">
+</head>
+
+<body class="landing-page">
+    <div class="glass-card slide-up" style="text-align: center;">
+        <h1 class="title">梨花祭2025</h1>
+
+        <!-- トークンなし -->
+        <div id="state-no-token" style="display: none;">
+            <p class="subtitle" style="color: var(--color-error);">招待リンクが必要です</p>
+            <p style="color: var(--color-text-sub); margin-top: 1rem;">このページへは招待リンクからアクセスしてください。</p>
+        </div>
+
+        <!-- 読み込み中 -->
+        <div id="state-loading">
+            <div class="loader" style="margin: 2rem auto;"></div>
+            <p style="color: var(--color-text-sub); font-size: 0.9rem;">読み込み中...</p>
+        </div>
+
+        <!-- 使用済み -->
+        <div id="state-used" style="display: none;">
+            <div style="width: 80px; height: 80px; border-radius: 50%; background-color: var(--color-error-bg); display: flex; align-items: center; justify-content: center; margin: 0 auto 1.5rem;">
+                <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="var(--color-error)" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
+                    <line x1="18" y1="6" x2="6" y2="18"></line>
+                    <line x1="6" y1="6" x2="18" y2="18"></line>
+                </svg>
+            </div>
+            <p class="subtitle" style="color: var(--color-error);">このリンクは使用済みです</p>
+            <p style="color: var(--color-text-sub);">当日受付でお知らせください。</p>
+        </div>
+
+        <!-- エラー -->
+        <div id="state-error" style="display: none;">
+            <p class="subtitle" style="color: var(--color-error);">無効なリンクです</p>
+            <p id="error-msg" style="color: var(--color-text-sub);">招待リンクが正しくありません。</p>
+        </div>
+
+        <!-- QR表示 -->
+        <div id="state-qr" style="display: none;">
+            <p class="subtitle">入場用QRコード</p>
+            <p id="guest-greeting" style="font-weight: 700; font-size: 1.1rem; margin-bottom: 1rem;"></p>
+            <img id="qr-image" src="" alt="入場用QRコード" style="width: 220px; height: 220px; border-radius: var(--radius-md); border: 3px solid var(--color-success);"/>
+            <div style="margin-top: 1.5rem; background: var(--color-bg); border-radius: var(--radius-md); padding: 1rem;">
+                <p style="font-size: 0.85rem; color: var(--color-text-sub);">このQRコードをスクリーンショットして<br>当日の受付でご提示ください</p>
+            </div>
+            <div style="margin-top: 1.5rem;">
+                <p style="font-size: var(--font-size-sm); color: var(--color-text-sub);">
+                    開催日時：2025年6月◯日（土）9:00〜14:00<br>
+                    千葉英和高等学校
+                </p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        (async function () {
+            const params = new URLSearchParams(window.location.search);
+            const token = params.get('token');
+
+            const states = {
+                noToken: document.getElementById('state-no-token'),
+                loading: document.getElementById('state-loading'),
+                used: document.getElementById('state-used'),
+                error: document.getElementById('state-error'),
+                qr: document.getElementById('state-qr'),
+            };
+
+            function show(key) {
+                Object.values(states).forEach(el => el.style.display = 'none');
+                states[key].style.display = 'block';
+            }
+
+            if (!token) {
+                show('noToken');
+                return;
+            }
+
+            show('loading');
+
+            try {
+                const res = await fetch(`/api/guest-entry/${encodeURIComponent(token)}?t=${new Date().getTime()}`, {
+                    headers: { 'Cache-Control': 'no-cache', 'Pragma': 'no-cache' }
+                });
+                const data = await res.json();
+
+
+                if (res.status === 410) {
+                    show('used');
+                    return;
+                }
+
+                if (!res.ok || !data.valid) {
+                    show('error');
+                    document.getElementById('error-msg').textContent = data.message || '無効な招待リンクです。';
+                    return;
+                }
+
+                // QR表示
+                document.getElementById('guest-greeting').textContent =
+                    `${data.guest_name} さんの入場券`;
+                document.getElementById('qr-image').src = data.qr_code;
+                show('qr');
+
+            } catch (e) {
+                show('error');
+                document.getElementById('error-msg').textContent = 'サーバーとの通信に失敗しました。時間をおいて再試行してください。';
+            }
+        })();
+    </script>
+
+    <footer style="text-align: center; margin-top: 2rem; padding: 1rem;">
+        <p style="color: var(--color-text-sub); font-size: 12px; margin-top: 0.5rem;">&copy; 2025 千葉英和高校梨花祭運営委員</p>
+    </footer>
+</body>
+
+</html>
