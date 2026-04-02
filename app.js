@@ -1273,7 +1273,12 @@ app.use((err, req, res, next) => {
     res.status(500).json({ message: 'サーバー内部エラーが発生しました。' });
 });
 
-// サーバー起動
-app.listen(port, () => {
-    console.log(`Server started on http://localhost:${port}/`);
-});
+// サーバー起動 (ローカル実行時のみ)
+if (require.main === module) {
+    app.listen(port, () => {
+        console.log(`Server started on http://localhost:${port}/`);
+    });
+}
+
+// Vercel等のサーバーレス環境用にアプリをエクスポート
+module.exports = app;
