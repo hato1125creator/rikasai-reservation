@@ -17,7 +17,6 @@ const fs = require('fs');
 const csvParser = require('csv-parser');
 const { v4: uuidv4 } = require('uuid');
 const crypto = require('crypto');
-const escapeHtml = require('escape-html');
 
 const app = express();
 const port = process.env.PORT || 3007;
