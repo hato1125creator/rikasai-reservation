@@ -1,4 +1,6 @@
 const { Sequelize, DataTypes, Op } = require('sequelize');
+const pg = require('pg'); // Vercelのバンドルエラー対策
+const pgHstore = require('pg-hstore'); // 同上
 
 if (!process.env.DATABASE_URL) {
     console.warn("WARNING: DATABASE_URL environment variable is not set. Database connection will fail.");
@@ -7,6 +9,7 @@ if (!process.env.DATABASE_URL) {
 // Supabase (PostgreSQL) 接続設定
 const sequelize = new Sequelize(process.env.DATABASE_URL, {
     dialect: 'postgres',
+    dialectModule: pg, // 確実にVercel上でロードされるようにする
     protocol: 'postgres',
     dialectOptions: {
         ssl: {
