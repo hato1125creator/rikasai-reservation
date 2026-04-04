@@ -106,6 +106,10 @@ const Student = sequelize.define('Student', {
 });
 
 const GuestSlot = sequelize.define('GuestSlot', {
+    id: {
+        type: DataTypes.STRING,
+        primaryKey: true
+    },
     token: {
         type: DataTypes.STRING,
         allowNull: false,

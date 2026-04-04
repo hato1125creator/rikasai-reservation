@@ -95,8 +95,8 @@ app.use(express.static(path.join(__dirname, 'server/public')));
 // DB initialization (PostgreSQL)
 const { sequelize, User, InviteCode, Reservation, Student, GuestSlot, Op } = require('./server/db-postgres');
 
-// データベース同期 (自動でテーブルを作成)
-sequelize.sync()
+// データベース同期 (自動でテーブルを作成/変更)
+sequelize.sync({ alter: true })
     .then(async () => {
         console.log('Database synced (PostgreSQL)');
         // 初期ユーザーの作成 (開発用、本番では別途管理)
