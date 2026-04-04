@@ -522,7 +522,7 @@ app.post(
     '/api/generate-invite-codes',
     authenticateToken,
     authorizeRole(['admin']),
-    multer({ dest: 'uploads/' }).single('csvFile'),
+    multer({ dest: require('os').tmpdir() }).single('csvFile'),
     async (req, res, next) => {
         if (!req.file) {
             return res.status(400).json({ error: 'CSVファイルが必要です。' });
@@ -577,8 +577,8 @@ app.post(
             await transaction.commit();
 
             // CSV 出力
-            const tmpFileName = `generated_invite_codes_${Date.now()}.csv`;
-            const csvWriter = createObjectCsvWriter({
+            const tmpFileName = require('path').join(require('os').tmpdir(), `generated_invite_codes_${Date.now()}.csv`);
+            const csvWriter = createCsvWriter({
                 path: tmpFileName,
                 header: [
                     { id: 'code', title: 'Code' },
@@ -921,8 +921,9 @@ app.get('/api/export-report', authenticateToken, authorizeRole(['admin']), async
     try {
         const reservations = await Reservation.findAll({ raw: true });
 
+        const reportPath = require('path').join(require('os').tmpdir(), 'report_data.csv');
         const csvWriter = createCsvWriter({
-            path: 'report_data.csv',
+            path: reportPath,
             header: [
                 { id: 'id', title: 'ID' },
                 { id: 'name', title: '名前' },
@@ -937,8 +938,10 @@ app.get('/api/export-report', authenticateToken, authorizeRole(['admin']), async
 
         await csvWriter.writeRecords(reservations);
 
-        res.download('report_data.csv', () => {
-            fs.unlinkSync('report_data.csv');
+        res.download(reportPath, 'report_data.csv', () => {
+            if (require('fs').existsSync(reportPath)) {
+                require('fs').unlinkSync(reportPath);
+            }
         });
 
     } catch (error) {
