@@ -61,6 +61,19 @@ const db = {
             data.users.push(user);
             writeData(data);
             return user;
+        },
+        async update(values, { where }) {
+            const data = readData();
+            let count = 0;
+            data.users.forEach(u => {
+                if (applyFilter(u, where)) {
+                    Object.assign(u, values);
+                    u.updatedAt = new Date().toISOString();
+                    count++;
+                }
+            });
+            writeData(data);
+            return [count];
         }
     },
     invite_codes: {
@@ -319,6 +332,13 @@ db.students = {
         });
         writeData(data);
         return [count];
+    },
+    async destroy({ where }) {
+        const data = readData();
+        const initialLen = data.students.length;
+        data.students = data.students.filter(s => !applyFilter(s, where));
+        writeData(data);
+        return initialLen - data.students.length;
     }
 };
 
@@ -359,6 +379,13 @@ db.guest_slots = {
         const data = readData();
         if (!where) return data.guest_slots.length;
         return data.guest_slots.filter(g => applyFilter(g, where)).length;
+    },
+    async destroy({ where }) {
+        const data = readData();
+        const initialLen = data.guest_slots.length;
+        data.guest_slots = data.guest_slots.filter(g => !applyFilter(g, where));
+        writeData(data);
+        return initialLen - data.guest_slots.length;
     }
 };
 

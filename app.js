@@ -19,6 +19,7 @@ const { v4: uuidv4 } = require('uuid');
 const crypto = require('crypto');
 
 const app = express();
+app.set('trust proxy', 1); // Vercelなどのリバースプロキシで正しいクライアントIPを取得するため
 const port = process.env.PORT || 3007;
 
 // 環境変数の検証
@@ -589,8 +590,12 @@ app.post(
 
             // ダウンロード
             res.download(tmpFileName, () => {
-                fs.unlinkSync(tmpFileName);
-                fs.unlinkSync(filePath);
+                try {
+                    if (fs.existsSync(tmpFileName)) fs.unlinkSync(tmpFileName);
+                    if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
+                } catch (e) {
+                    console.error('Failed to unlink temporary files:', e);
+                }
             });
 
         } catch (error) {

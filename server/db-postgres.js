@@ -102,6 +102,10 @@ const Student = sequelize.define('Student', {
     otp_expires_at: {
         type: DataTypes.DATE,
         allowNull: true
+    },
+    max_guest_slots: {
+        type: DataTypes.INTEGER,
+        allowNull: true
     }
 });
 
