@@ -114,6 +114,12 @@
                     <label class="form-label" for="reg-name">氏名</label>
                     <input class="form-input" type="text" id="reg-name" placeholder="例: 山田 太郎">
                 </div>
+                <div class="form-group">
+                    <label class="form-label" for="reg-grade-class">学年・クラス</label>
+                    <select class="form-input" id="reg-grade-class" style="appearance: auto; padding-right: 2rem;">
+                        <option value="">選択してください</option>
+                    </select>
+                </div>
                 <p id="register-error" class="help is-danger" style="display:none;"></p>
                 <button class="btn btn-primary" style="width:100%;" onclick="sendRegisterOtp()">認証コードを送信</button>
             </div>
@@ -172,6 +178,13 @@
             <p style="margin-top: 1.5rem; font-size: 0.8rem; color: var(--color-text-sub);">
                 ※ 招待リンクをゲストに送ってください。ゲストはリンクを開くだけで入場QRが表示されます。
             </p>
+
+            <div style="margin-top: 1.5rem; background: var(--color-bg); padding: 1rem; border-radius: 8px;">
+                <h3 style="font-size: 0.95rem; margin-top:0; margin-bottom: 0.5rem; color: var(--color-text);">📝 招待メッセージの設定</h3>
+                <textarea id="input-message-template" class="form-input" rows="3" style="resize: vertical; min-height: 80px;" placeholder="梨花祭にご招待します！以下のURLから入場チケットとなるQRコードを表示できます。&#10;【チケットURL】&#10;{URL}"></textarea>
+                <p style="font-size: 0.75rem; color: var(--color-text-sub); margin-top: 0.25rem;">※ <code>{URL}</code> と <code>{GUEST_NAME}</code> は自動で置き換わります。</p>
+                <button class="btn btn-outline" style="width:100%; margin-top: 0.5rem;" onclick="saveMessageTemplate()">テンプレートを保存</button>
+            </div>
         </div>
 
     </div>
@@ -181,11 +194,32 @@
         let studentEmail = localStorage.getItem('student_email') || '';
         let maxSlots = 3;
         let currentTab = 'login'; // 'login' | 'register'
+        let currentMessageTemplate = ''; // テンプレート保存用
 
         // ===== 初期化 =====
         window.addEventListener('DOMContentLoaded', () => {
+            populateGradeClassOptions();
             if (studentToken) loadDashboard();
         });
+
+        // 学年クラスの選択肢を動的生成
+        function populateGradeClassOptions() {
+            const select = document.getElementById('reg-grade-class');
+            for (let grade = 1; grade <= 3; grade++) {
+                for (let cls = 1; cls <= 12; cls++) {
+                    const opt = document.createElement('option');
+                    opt.value = `${grade}-${cls}`;
+                    opt.textContent = `${grade}年${cls}組`;
+                    select.appendChild(opt);
+                }
+                ['E1', 'E2'].forEach(cls => {
+                    const opt = document.createElement('option');
+                    opt.value = `${grade}-${cls}`;
+                    opt.textContent = `${grade}年${cls}組`;
+                    select.appendChild(opt);
+                });
+            }
+        }
 
         // ===== タブ切り替え =====
         function switchTab(tab) {
@@ -245,11 +279,12 @@
         async function sendRegisterOtp() {
             const email = document.getElementById('reg-email').value.trim();
             const name = document.getElementById('reg-name').value.trim();
+            const grade_class = document.getElementById('reg-grade-class').value;
             const errEl = document.getElementById('register-error');
             errEl.style.display = 'none';
 
-            if (!email || !name) {
-                errEl.textContent = 'メールアドレスと氏名を入力してください。';
+            if (!email || !name || !grade_class) {
+                errEl.textContent = 'メールアドレス、氏名、学年クラスを入力してください。';
                 errEl.style.display = 'block';
                 return;
             }
@@ -259,7 +294,7 @@
                 const res = await fetch('/api/student/request-otp', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ email, name })
+                    body: JSON.stringify({ email, name, grade_class })
                 });
                 const data = await res.json();
                 setLoading(false);
@@ -333,10 +368,14 @@
                 if (res.status === 401 || res.status === 403) { logout(); return; }
                 const data = await res.json();
                 maxSlots = data.maxSlots || 3;
+                currentMessageTemplate = data.message_template || '';
+
+                const defaultTemplate = "梨花祭にご招待します！以下のURLから入場チケットとなるQRコードを表示できます。\n【チケットURL】\n{URL}";
+                document.getElementById('input-message-template').value = currentMessageTemplate || defaultTemplate;
 
                 document.getElementById('page-login').style.display = 'none';
                 document.getElementById('page-dashboard').style.display = 'block';
-                document.getElementById('dash-name').textContent = `${data.name} さん`;
+                document.getElementById('dash-name').textContent = `${data.name} さん${data.grade_class ? ' (' + data.grade_class + ')' : ''}`;
                 renderSlots(data.slots);
             } catch (e) {
                 console.error('ダッシュボード読み込みエラー:', e);
@@ -373,8 +412,11 @@
                         </div>
                     </div>
                     ${!slot.used
-                        ? `<button class="btn-copy" id="copy-btn-${i}" onclick="copyLink('${escHtml(url)}', ${i})">コピー</button>`
-                        : '<span style="font-size:0.8rem; color: var(--color-text-sub);">入場済み</span>'
+                        ? `<div style="display:flex; gap:0.5rem; margin-top:0.5rem;">
+                               <button class="btn-copy" style="flex:1;" id="copy-btn-${i}" onclick="copyLink('${escHtml(url)}', ${i}, '${escHtml(slot.guest_name)}')">コピー</button>
+                               <button class="btn-copy" style="flex:1; background:#06C755; color:white; border:none;" onclick="shareLine('${escHtml(url)}', '${escHtml(slot.guest_name)}')">LINE</button>
+                           </div>`
+                        : '<span style="font-size:0.8rem; color: var(--color-text-sub); display:block; margin-top:0.5rem;">入場済み</span>'
                     }
                 `;
                 container.appendChild(div);
@@ -458,10 +500,40 @@
             }
         }
 
-        // ===== コピー =====
-        async function copyLink(url, idx) {
+        // ===== メッセージテンプレート =====
+        async function saveMessageTemplate() {
+            const tmpl = document.getElementById('input-message-template').value;
             try {
-                await navigator.clipboard.writeText(url);
+                const res = await fetch('/api/student/message-template', {
+                    method: 'PUT',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${studentToken}`
+                    },
+                    body: JSON.stringify({ message_template: tmpl })
+                });
+                if (res.ok) {
+                    currentMessageTemplate = tmpl;
+                    alert('テンプレートを保存しました。');
+                } else {
+                    const data = await res.json();
+                    alert(data.message || '保存に失敗しました。');
+                }
+            } catch (e) {
+                alert('サーバーエラーが発生しました。');
+            }
+        }
+
+        function createMessage(url, guestName) {
+            const template = currentMessageTemplate || "梨花祭にご招待します！以下のURLから入場チケットとなるQRコードを表示できます。\n【チケットURL】\n{URL}";
+            return template.replace(/\{URL\}/g, url).replace(/\{GUEST_NAME\}/g, guestName);
+        }
+
+        // ===== コピー =====
+        async function copyLink(url, idx, guestName) {
+            const textToCopy = createMessage(url, guestName);
+            try {
+                await navigator.clipboard.writeText(textToCopy);
                 const btn = document.getElementById(`copy-btn-${idx}`);
                 if (btn) {
                     btn.textContent = 'コピー済み！';
@@ -469,8 +541,14 @@
                     setTimeout(() => { btn.textContent = 'コピー'; btn.classList.remove('copied'); }, 2000);
                 }
             } catch (e) {
-                prompt('URLをコピーしてください:', url);
+                prompt('以下のテキストをコピーしてください:', textToCopy);
             }
+        }
+
+        function shareLine(url, guestName) {
+            const text = createMessage(url, guestName);
+            const lineUrl = `https://line.me/R/msg/text/?${encodeURIComponent(text)}`;
+            window.open(lineUrl, '_blank');
         }
 
         // ===== ユーティリティ =====

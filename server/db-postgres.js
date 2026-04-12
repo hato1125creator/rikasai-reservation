@@ -106,6 +106,14 @@ const Student = sequelize.define('Student', {
     max_guest_slots: {
         type: DataTypes.INTEGER,
         allowNull: true
+    },
+    grade_class: {
+        type: DataTypes.STRING,
+        allowNull: true
+    },
+    message_template: {
+        type: DataTypes.TEXT,
+        allowNull: true
     }
 });
 
@@ -142,19 +150,20 @@ const GuestSlot = sequelize.define('GuestSlot', {
 });
 
 // Student に findOne と update メソッド以外の互換用メソッドが必要な場合はここに追加
-Student.upsertOtp = async function(email, name, otp, otp_expires_at) {
+Student.upsertOtp = async function(email, name, otp, otp_expires_at, grade_class) {
     let student = await Student.findOne({ where: { email } });
     if (student) {
         student.name = name;
         student.otp = otp;
         student.otp_expires_at = otp_expires_at;
+        if (grade_class !== undefined) student.grade_class = grade_class;
         await student.save();
         return student;
     } else {
         const requireCrypto = require('crypto');
         const id = requireCrypto.randomBytes(8).toString('hex');
         student = await Student.create({
-            id, email, name, otp, otp_expires_at
+            id, email, name, otp, otp_expires_at, grade_class: grade_class || null
         });
         return student;
     }

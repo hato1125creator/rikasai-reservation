@@ -632,24 +632,24 @@ app.get('/api/search', authenticateToken, authorizeRole(['admin']), async (req, 
     }
 });
 
-// レポートエンドポイント (管理者のみ)
-// レポートエンドポイント (管理者のみ)
+// レポートエンドポイント (管理者のみ) — GuestSlot ベース
 app.get('/api/report', authenticateToken, authorizeRole(['admin']), async (req, res, next) => {
     try {
-        const reservations = await Reservation.findAll();
+        const slots = await GuestSlot.findAll();
+        const students = await Student.findAll();
 
-        const totalReservations = reservations.length;
-        const checkedInCount = reservations.filter(r => r.status === 'checked-in').length;
-        const cancelledCount = reservations.filter(r => r.status === 'cancelled').length;
-        const pendingCount = reservations.filter(r => r.status === 'pending').length;
+        const totalSlots = slots.length;
+        const checkedInCount = slots.filter(s => s.used).length;
+        const unusedCount = slots.filter(s => !s.used).length;
+        const totalStudents = students.length;
 
-        // 時間帯別入場者数
+        // 時間帯別・日別入場者数 (checked_in_at ベース)
         const hourlyDataMap = {};
         const dailyDataMap = {};
 
-        reservations.forEach(r => {
-            if (r.status === 'checked-in') {
-                const date = new Date(r.updatedAt);
+        slots.forEach(s => {
+            if (s.used && s.checked_in_at) {
+                const date = new Date(s.checked_in_at);
                 const hour = date.getHours();
                 const day = date.toISOString().split('T')[0];
 
@@ -669,19 +669,50 @@ app.get('/api/report', authenticateToken, authorizeRole(['admin']), async (req, 
         }
 
         // 最新入場
-        const checkedInReservations = reservations.filter(r => r.status === 'checked-in');
-        const latestCheckinReservation = checkedInReservations.sort((a, b) => new Date(b.updatedAt) - new Date(a.updatedAt))[0];
-        const latestCheckin = latestCheckinReservation ? latestCheckinReservation.updatedAt : null;
+        const checkedInSlots = slots.filter(s => s.used && s.checked_in_at);
+        const latestSlot = checkedInSlots.sort((a, b) => new Date(b.checked_in_at) - new Date(a.checked_in_at))[0];
+        const latestCheckin = latestSlot ? latestSlot.checked_in_at : null;
+
+        // 生徒別統計
+        const studentStatsMap = {};
+        slots.forEach(s => {
+            const key = s.student_email || 'unknown';
+            if (!studentStatsMap[key]) {
+                studentStatsMap[key] = { name: s.student_name || key, total: 0, checkedIn: 0 };
+            }
+            studentStatsMap[key].total++;
+            if (s.used) studentStatsMap[key].checkedIn++;
+        });
+        const studentStats = Object.values(studentStatsMap).sort((a, b) => b.total - a.total);
+
+        // クラス別統計
+        const classStatsMap = {};
+        const studentClassMap = {};
+        students.forEach(s => {
+            if (s.grade_class) studentClassMap[s.email] = s.grade_class;
+        });
+        slots.forEach(s => {
+            const gc = studentClassMap[s.student_email] || '未設定';
+            if (!classStatsMap[gc]) classStatsMap[gc] = { grade_class: gc, total: 0, checkedIn: 0, students: new Set() };
+            classStatsMap[gc].total++;
+            if (s.used) classStatsMap[gc].checkedIn++;
+            classStatsMap[gc].students.add(s.student_email);
+        });
+        const classStats = Object.values(classStatsMap).map(c => ({
+            grade_class: c.grade_class, total: c.total, checkedIn: c.checkedIn, studentCount: c.students.size
+        })).sort((a, b) => a.grade_class.localeCompare(b.grade_class, 'ja'));
 
         res.json({
-            total_reservations: totalReservations,
+            total_slots: totalSlots,
             checked_in_count: checkedInCount,
-            cancelled_count: cancelledCount,
-            pending_count: pendingCount,
+            unused_count: unusedCount,
+            total_students: totalStudents,
             hourly_data: hourlyData,
             daily_data: dailyData,
             peak_time: peakTime,
             latest_checkin: latestCheckin,
+            student_stats: studentStats,
+            class_stats: classStats,
         });
     } catch (error) {
         next(error);
@@ -760,8 +791,16 @@ app.post('/api/verify', authenticateToken, async (req, res, next) => {
 // 管理者: guest_slots一覧 (reception, scannerも閲覧可)
 app.get('/api/admin/guest-slots', authenticateToken, authorizeRole(['admin', 'reception', 'scanner']), async (req, res, next) => {
     try {
-        const slots = await GuestSlot.findAll();
-        res.json({ slots });
+        const slots = await GuestSlot.findAll({ raw: true });
+        const students = await Student.findAll({ raw: true });
+        const classMap = {};
+        students.forEach(s => { if (s.grade_class) classMap[s.email] = s.grade_class; });
+        
+        const slotsWithClass = slots.map(s => ({
+            ...s,
+            grade_class: classMap[s.student_email] || null
+        }));
+        res.json({ slots: slotsWithClass });
     } catch (error) {
         next(error);
     }
@@ -815,6 +854,7 @@ app.get('/api/admin/students', authenticateToken, authorizeRole(['admin']), asyn
                 id: s.id,
                 name: s.name,
                 email: s.email,
+                grade_class: s.grade_class || null,
                 createdAt: s.createdAt,
                 totalSlots: mySlots.length,
                 usedSlots: mySlots.filter(sl => sl.used).length,
@@ -843,6 +883,7 @@ app.put('/api/admin/students/:id', authenticateToken, authorizeRole(['admin']), 
         const updates = {};
         if (name) updates.name = name;
         if (max_guest_slots !== undefined) updates.max_guest_slots = max_guest_slots === '' ? null : parseInt(max_guest_slots, 10);
+        if (req.body.grade_class !== undefined) updates.grade_class = req.body.grade_class || null;
         
         await Student.update(updates, { where: { id: req.params.id } });
         res.json({ message: '生徒情報を更新しました。' });
@@ -992,10 +1033,14 @@ app.delete('/api/admin/accounts/:id', authenticateToken, authorizeRole(['admin']
 app.get('/api/admin/export/csv', authenticateToken, authorizeRole(['admin']), async (req, res, next) => {
     try {
         const slots = await GuestSlot.findAll();
-        const rows = [['ゲスト名', '招待した生徒', '生徒メール', '入場済み', 'チェックイン日時', '作成日時']];
+        const students = await Student.findAll();
+        const classMap = {};
+        students.forEach(s => { classMap[s.email] = s.grade_class || ''; });
+
+        const rows = [['ゲスト名', '招待した生徒', '学年クラス', '生徒メール', '入場済み', 'チェックイン日時', '作成日時']];
         slots.forEach(s => {
             rows.push([
-                s.guest_name, s.student_name || '', s.student_email || '',
+                s.guest_name, s.student_name || '', classMap[s.student_email] || '', s.student_email || '',
                 s.used ? '済み' : '未', s.checked_in_at || '', s.createdAt
             ]);
         });
@@ -1145,7 +1190,8 @@ app.post('/api/student/login-otp', otpLimiter, [
 // OTP送信
 app.post('/api/student/request-otp', otpLimiter, [
     body('email').isEmail().withMessage('有効なメールアドレスを入力してください'),
-    body('name').isString().trim().notEmpty().withMessage('名前は必須です')
+    body('name').isString().trim().notEmpty().withMessage('名前は必須です'),
+    body('grade_class').isString().trim().notEmpty().withMessage('学年クラスは必須です')
 ], async (req, res, next) => {
     try {
         const errors = validationResult(req);
@@ -1153,7 +1199,7 @@ app.post('/api/student/request-otp', otpLimiter, [
             return res.status(400).json({ message: errors.array()[0].msg });
         }
 
-        const { email, name } = req.body;
+        const { email, name, grade_class } = req.body;
         const normalizedEmail = email.trim().toLowerCase();
 
         // ドメイン制限
@@ -1165,7 +1211,7 @@ app.post('/api/student/request-otp', otpLimiter, [
         const otp = Math.floor(100000 + Math.random() * 900000).toString();
         const otpExpiresAt = new Date(Date.now() + 10 * 60 * 1000).toISOString(); // 10分後
 
-        await Student.upsertOtp(normalizedEmail, escapeHtml(name.trim()), otp, otpExpiresAt);
+        await Student.upsertOtp(normalizedEmail, escapeHtml(name.trim()), otp, otpExpiresAt, escapeHtml(grade_class.trim()));
 
         // メール送信
         const mailOptions = {
@@ -1224,12 +1270,12 @@ app.post('/api/student/verify-otp', loginLimiter, [
         );
 
         const token = jwt.sign(
-            { id: student.id, email: student.email, name: student.name, role: 'student' },
+            { id: student.id, email: student.email, name: student.name, grade_class: student.grade_class || null, role: 'student' },
             STUDENT_JWT_SECRET,
             { expiresIn: '4h' }
         );
 
-        res.json({ success: true, token, name: student.name });
+        res.json({ success: true, token, name: student.name, grade_class: student.grade_class || null });
     } catch (error) {
         next(error);
     }
@@ -1264,11 +1310,32 @@ app.get('/api/student/dashboard', authenticateStudent, async (req, res, next) =>
         }));
         res.json({
             name: req.student.name,
+            grade_class: student ? student.grade_class || null : null,
+            message_template: student ? student.message_template || null : null,
             slots: safeSlots,
             maxSlots: maxSlots
         });
     } catch (error) {
 
+        next(error);
+    }
+});
+
+// 招待メッセージテンプレートの更新
+app.put('/api/student/message-template', authenticateStudent, [
+    body('message_template').isString().withMessage('テンプレートは文字列で指定してください')
+], async (req, res, next) => {
+    try {
+        const errors = validationResult(req);
+        if (!errors.isEmpty()) return res.status(400).json({ message: errors.array()[0].msg });
+
+        const { message_template } = req.body;
+        await Student.update(
+            { message_template },
+            { where: { email: req.student.email } }
+        );
+        res.json({ message: 'メッセージテンプレートを更新しました。' });
+    } catch (error) {
         next(error);
     }
 });

@@ -152,9 +152,9 @@
                         <div style="overflow-x: auto;">
                             <table class="data-table">
                                 <thead>
-                                    <tr>
                                         <th>ゲスト名</th>
                                         <th>招待した生徒</th>
+                                        <th>生徒クラス</th>
                                         <th>ステータス</th>
                                         <th>作成日時</th>
                                         <th>操作</th>
@@ -230,12 +230,24 @@
                             <h2 class="section-title" style="margin:0;">👨‍🏫 登録生徒管理</h2>
                             <button class="btn btn-primary" onclick="loadStudentList()">🔄 更新</button>
                         </div>
-                        <p style="color: var(--text-secondary); margin-bottom: 1.5rem; font-size: 0.9rem;">学校メール（@biblos.ac.jp）でOTP認証を完了した生徒の一覧です。削除すると関連する招待リンクも全て削除されます。</p>
+                        <p style="color: var(--text-secondary); margin-bottom: 1rem; font-size: 0.9rem;">学校メール（@biblos.ac.jp）でOTP認証を完了した生徒の一覧です。削除すると関連する招待リンクも全て削除されます。</p>
+                        <div class="filter-bar" style="margin-bottom:1rem;">
+                            <div class="filter-group">
+                                <label class="form-label mb-0">クラス:</label>
+                                <select class="form-select" id="student-class-filter" onchange="loadStudentList()" style="min-width:140px;">
+                                    <option value="">すべて</option>
+                                </select>
+                            </div>
+                            <div class="filter-group">
+                                <input class="form-input" type="text" id="student-search" placeholder="氏名で絞り込み..." oninput="filterStudentList()" style="min-width:160px;">
+                            </div>
+                        </div>
                         <div style="overflow-x: auto;">
                             <table class="data-table">
                                 <thead>
                                     <tr>
                                         <th>氏名</th>
+                                        <th>クラス</th>
                                         <th>メールアドレス</th>
                                         <th>招待枠使用</th>
                                         <th>入場済</th>
@@ -244,7 +256,7 @@
                                     </tr>
                                 </thead>
                                 <tbody id="student-table-body">
-                                    <tr><td colspan="6" style="text-align:center;">読み込み中...</td></tr>
+                                    <tr><td colspan="7" style="text-align:center;">読み込み中...</td></tr>
                                 </tbody>
                             </table>
                         </div>
@@ -351,7 +363,7 @@
                     <div class="dashboard-grid">
                         <div class="metric-card">
                             <div class="metric-value" id="total-count">-</div>
-                            <div class="metric-label">総予約数</div>
+                            <div class="metric-label">総招待数</div>
                             <div class="metric-change" id="total-change">-</div>
                         </div>
                         <div class="metric-card success">
@@ -360,21 +372,21 @@
                             <div class="metric-change" id="checked-in-percent">-%</div>
                         </div>
                         <div class="metric-card warning">
-                            <div class="metric-value" id="pending-count">-</div>
-                            <div class="metric-label">保留中</div>
-                            <div class="metric-change" id="pending-percent">-%</div>
+                            <div class="metric-value" id="unused-count">-</div>
+                            <div class="metric-label">未使用</div>
+                            <div class="metric-change" id="unused-percent">-%</div>
                         </div>
-                        <div class="metric-card danger">
-                            <div class="metric-value" id="cancelled-count">-</div>
-                            <div class="metric-label">キャンセル</div>
-                            <div class="metric-change" id="cancelled-percent">-%</div>
+                        <div class="metric-card" style="border-left-color: #6366f1;">
+                            <div class="metric-value" id="student-count">-</div>
+                            <div class="metric-label">登録生徒数</div>
+                            <div class="metric-change" id="student-change">-</div>
                         </div>
                     </div>
 
                     <!-- グラフエリア -->
                     <div class="chart-grid">
                         <div class="glass-card">
-                            <h3 class="section-title">予約状況分布</h3>
+                            <h3 class="section-title">入場状況分布</h3>
                             <div class="chart-container">
                                 <canvas id="statusChart" height="200"></canvas>
                             </div>
@@ -407,35 +419,78 @@
                                         <td id="peak-time">-</td>
                                     </tr>
                                     <tr>
-                                        <th>平均処理時間</th>
-                                        <td id="avg-checkin-time">-</td>
-                                    </tr>
-                                    <tr>
                                         <th>最新入場</th>
                                         <td id="latest-checkin">-</td>
+                                    </tr>
+                                    <tr>
+                                        <th>入場率</th>
+                                        <td id="checkin-rate">-</td>
                                     </tr>
                                 </tbody>
                             </table>
                             <table class="data-table">
                                 <tbody>
                                     <tr>
-                                        <th>入場率</th>
-                                        <td id="checkin-rate">-</td>
-                                    </tr>
-                                    <tr>
-                                        <th>キャンセル率</th>
-                                        <td id="cancel-rate">-</td>
-                                    </tr>
-                                    <tr>
-                                        <th>残り予定数</th>
+                                        <th>未入場数</th>
                                         <td id="remaining-count">-</td>
+                                    </tr>
+                                    <tr>
+                                        <th>登録生徒数</th>
+                                        <td id="total-students-detail">-</td>
+                                    </tr>
+                                    <tr>
+                                        <th>1人あたり平均招待数</th>
+                                        <td id="avg-slots-per-student">-</td>
                                     </tr>
                                 </tbody>
                             </table>
                         </div>
                     </div>
 
-                    <!-- コントロールエリア -->
+                    <!-- 生徒別統計 -->
+                    <div class="glass-card">
+                        <h3 class="section-title">生徒別招待状況（上位）</h3>
+                        <div style="overflow-x: auto; max-height: 400px; overflow-y: auto;">
+                            <table class="data-table">
+                                <thead>
+                                    <tr>
+                                        <th>生徒名</th>
+                                        <th>招待数</th>
+                                        <th>入場済み</th>
+                                        <th>入場率</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="student-stats-tbody">
+                                    <tr><td colspan="4" style="text-align:center;">データを読み込み中...</td></tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <!-- クラス別統計 -->
+                    <div class="glass-card">
+                        <h3 class="section-title">クラス別招待・入場状況</h3>
+                        <div class="chart-container" style="margin-bottom:1.5rem;">
+                            <canvas id="classChart" height="200"></canvas>
+                        </div>
+                        <div style="overflow-x: auto; max-height: 400px; overflow-y: auto;">
+                            <table class="data-table">
+                                <thead>
+                                    <tr>
+                                        <th>クラス</th>
+                                        <th>生徒数</th>
+                                        <th>招待数</th>
+                                        <th>入場済み</th>
+                                        <th>入場率</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="class-stats-tbody">
+                                    <tr><td colspan="5" style="text-align:center;">データを読み込み中...</td></tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
                     <div class="glass-card">
                         <div style="display: flex; align-items: center; gap: 2rem; flex-wrap: wrap;">
                             <label style="display: flex; align-items: center; gap: 0.5rem;">
@@ -446,8 +501,8 @@
                                 <button class="btn btn-primary" onclick="loadDashboard()">
                                     ダッシュボード更新
                                 </button>
-                                <button class="btn btn-outline" onclick="exportReportData()">
-                                    データエクスポート
+                                <button class="btn btn-outline" onclick="exportCsv()">
+                                    CSVエクスポート
                                 </button>
                             </div>
                         </div>
@@ -548,7 +603,7 @@
 
         // グローバル変数 (最小限に)
         let html5QrCodeScanner;
-        let statusChart, hourlyChart, dailyChart;
+        let statusChart, hourlyChart, dailyChart, classChart;
         let autoRefreshIntervalId;
 
         // DOM要素のキャッシュ
@@ -580,20 +635,22 @@
             generatedCodesTableBody: document.getElementById("generated-codes-table-body"),
             totalCount: document.getElementById("total-count"),
             checkedInCount: document.getElementById("checked-in-count"),
-            pendingCount: document.getElementById("pending-count"),
-            cancelledCount: document.getElementById("cancelled-count"),
+            unusedCount: document.getElementById("unused-count"),
+            studentCount: document.getElementById("student-count"),
             checkedInPercent: document.getElementById("checked-in-percent"),
-            pendingPercent: document.getElementById("pending-percent"),
-            cancelledPercent: document.getElementById("cancelled-percent"),
+            unusedPercent: document.getElementById("unused-percent"),
             peakTime: document.getElementById("peak-time"),
-            avgCheckinTime: document.getElementById("avg-checkin-time"),
             latestCheckin: document.getElementById("latest-checkin"),
             checkinRate: document.getElementById("checkin-rate"),
-            cancelRate: document.getElementById("cancel-rate"),
             remainingCount: document.getElementById("remaining-count"),
+            totalStudentsDetail: document.getElementById("total-students-detail"),
+            avgSlotsPerStudent: document.getElementById("avg-slots-per-student"),
+            studentStatsTbody: document.getElementById("student-stats-tbody"),
+            classStatsTbody: document.getElementById("class-stats-tbody"),
             statusChartCanvas: document.getElementById("statusChart"),
             hourlyChartCanvas: document.getElementById("hourlyChart"),
             dailyChartCanvas: document.getElementById("dailyChart"),
+            classChartCanvas: document.getElementById("classChart"),
             autoRefreshCheckbox: document.getElementById("auto-refresh"),
             successSound: document.getElementById("success-sound"),
             errorSound: document.getElementById("error-sound"),
@@ -1075,6 +1132,7 @@
                     row.innerHTML = `
                         <td><strong>${slot.guest_name}</strong></td>
                         <td>${slot.student_name || '—'}</td>
+                        <td>${slot.grade_class || '—'}</td>
                         <td>
                             <span class="status-tag ${slot.used ? 'status-checked-in' : 'status-pending'}">
                                 ${slot.used ? '✅ 入場済み' : '⏳ 未使用'}
@@ -1208,11 +1266,12 @@
             }
         }
 
+        let cachedStudentData = null; // for filtering without refetch
+
         async function loadStudentList() {
             const tbody = document.getElementById('student-table-body');
-            tbody.innerHTML = '<tr><td colspan="4" style="text-align:center;">読み込み中...</td></tr>';
+            tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;">読み込み中...</td></tr>';
             try {
-                // 生徒一覧はguest_slotsから生徒名+メールを集計
                 const [slotsRes, studRes] = await Promise.all([
                     authFetch(`${API_BASE_URL}/api/admin/guest-slots`),
                     authFetch(`${API_BASE_URL}/api/admin/students`)
@@ -1220,14 +1279,14 @@
 
                 if (studRes && studRes.ok) {
                     const { students } = await studRes.json();
-                    tbody.innerHTML = '';
-                    if (students.length === 0) {
-                        tbody.innerHTML = '<tr><td colspan="4" style="text-align:center;">登録された生徒はいません</td></tr>';
-                        return;
-                    }
-
-                    // スロット数を集計
                     const { slots } = await slotsRes.json();
+
+                    // populate class filter (preserve selection)
+                    const classFilter = document.getElementById('student-class-filter');
+                    const prevVal = classFilter.value;
+                    const classes = [...new Set(students.map(s => s.grade_class).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'ja'));
+                    classFilter.innerHTML = '<option value="">すべて</option>' + classes.map(c => `<option value="${c}"${c === prevVal ? ' selected' : ''}>${c}</option>`).join('');
+
                     const slotCountMap = {};
                     const usedCountMap = {};
                     slots.forEach(s => {
@@ -1235,24 +1294,9 @@
                         if (s.used) usedCountMap[s.student_email] = (usedCountMap[s.student_email] || 0) + 1;
                     });
 
-                    students.forEach(s => {
-                        const row = document.createElement('tr');
-                        row.innerHTML = `
-                            <td><strong>${s.name}</strong></td>
-                            <td style="font-size:0.85rem;">${s.email}</td>
-                            <td style="text-align:center;">${slotCountMap[s.email] || 0} 枠</td>
-                            <td style="text-align:center;"><span class="status-tag status-checked-in">${usedCountMap[s.email] || 0} 人</span></td>
-                            <td style="font-size:0.85rem;">${formatDateTime(s.createdAt)}</td>
-                            <td style="white-space:nowrap;">
-                                <button class="btn btn-primary" style="font-size:0.75rem;padding:0.3rem 0.6rem;margin-right:0.3rem;" onclick="openStudentGuestsModal('${s.id}', '${s.name}')">👤 ゲスト詳細</button>
-                                <button class="btn btn-outline" style="font-size:0.75rem;padding:0.3rem 0.6rem;margin-right:0.3rem;" onclick="editStudent('${s.id}', '${s.name}', '${s.max_slots === null ? '' : s.max_slots}')">編集</button>
-                                <button class="btn btn-danger" style="font-size:0.75rem;padding:0.3rem 0.6rem;" onclick="deleteStudent('${s.id}', '${s.name}')">削除</button>
-                            </td>
-                        `;
-                        tbody.appendChild(row);
-                    });
+                    cachedStudentData = { students, slotCountMap, usedCountMap };
+                    renderStudentRows();
                 } else {
-                    // APIがなければguest_slotsから生徒一覧を生成
                     const { slots } = await slotsRes.json();
                     const studentMap = {};
                     slots.forEach(s => {
@@ -1264,25 +1308,69 @@
                     const students = Object.values(studentMap);
                     tbody.innerHTML = '';
                     if (students.length === 0) {
-                        tbody.innerHTML = '<tr><td colspan="4" style="text-align:center;">まだ招待リンクを作成した生徒はいません</td></tr>';
+                        tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;">まだ招待リンクを作成した生徒はいません</td></tr>';
                         return;
                     }
                     students.forEach(s => {
                         const row = document.createElement('tr');
-                        row.innerHTML = `<td>${s.name}</td><td>${s.email}</td><td>${s.count} 枠</td><td>—</td>`;
+                        row.innerHTML = `<td>${s.name}</td><td>—</td><td>${s.email}</td><td>${s.count} 枠</td><td>—</td><td>—</td><td>—</td>`;
                         tbody.appendChild(row);
                     });
                 }
             } catch (e) {
-                tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;">取得エラー</td></tr>';
+                tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;">取得エラー</td></tr>';
                 console.error(e);
             }
         }
 
-        async function editStudent(id, currentName, currentMaxSlots) {
+        function filterStudentList() {
+            renderStudentRows();
+        }
+
+        function renderStudentRows() {
+            if (!cachedStudentData) return;
+            const { students, slotCountMap, usedCountMap } = cachedStudentData;
+            const tbody = document.getElementById('student-table-body');
+            const classFilter = document.getElementById('student-class-filter').value;
+            const nameSearch = (document.getElementById('student-search').value || '').toLowerCase();
+
+            let filtered = students;
+            if (classFilter) filtered = filtered.filter(s => s.grade_class === classFilter);
+            if (nameSearch) filtered = filtered.filter(s => (s.name || '').toLowerCase().includes(nameSearch));
+
+            tbody.innerHTML = '';
+            if (filtered.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;">該当する生徒はいません</td></tr>';
+                return;
+            }
+
+            filtered.forEach(s => {
+                const row = document.createElement('tr');
+                const gc = s.grade_class || '—';
+                row.innerHTML = `
+                    <td><strong>${s.name}</strong></td>
+                    <td>${gc}</td>
+                    <td style="font-size:0.85rem;">${s.email}</td>
+                    <td style="text-align:center;">${slotCountMap[s.email] || 0} 枠</td>
+                    <td style="text-align:center;"><span class="status-tag status-checked-in">${usedCountMap[s.email] || 0} 人</span></td>
+                    <td style="font-size:0.85rem;">${formatDateTime(s.createdAt)}</td>
+                    <td style="white-space:nowrap;">
+                        <button class="btn btn-primary" style="font-size:0.75rem;padding:0.3rem 0.6rem;margin-right:0.3rem;" onclick="openStudentGuestsModal('${s.id}', '${s.name}')">👤 ゲスト詳細</button>
+                        <button class="btn btn-outline" style="font-size:0.75rem;padding:0.3rem 0.6rem;margin-right:0.3rem;" onclick="editStudent('${s.id}', '${s.name}', '${s.max_slots === null ? '' : s.max_slots}', '${gc === '—' ? '' : gc}')">編集</button>
+                        <button class="btn btn-danger" style="font-size:0.75rem;padding:0.3rem 0.6rem;" onclick="deleteStudent('${s.id}', '${s.name}')">削除</button>
+                    </td>
+                `;
+                tbody.appendChild(row);
+            });
+        }
+
+        async function editStudent(id, currentName, currentMaxSlots, currentGradeClass) {
             const newName = prompt("生徒の名前を変更します:", currentName);
             if (newName === null) return;
             
+            const newGradeClass = prompt("学年クラスを変更します（例: 2-5, 1-E1）:", currentGradeClass);
+            if (newGradeClass === null) return;
+
             const newSlots = prompt("ゲスト枠の上限数を設定します（空欄でシステムの基本設定に準拠）:", currentMaxSlots);
             if (newSlots === null) return;
 
@@ -1290,7 +1378,7 @@
                 const res = await authFetch(`${API_BASE_URL}/api/admin/students/${id}`, {
                     method: 'PUT',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ name: newName, max_guest_slots: newSlots })
+                    body: JSON.stringify({ name: newName, max_guest_slots: newSlots, grade_class: newGradeClass })
                 });
                 const data = await res.json();
                 showNotification(data.message, res.ok ? 'success' : 'error');
@@ -1512,6 +1600,7 @@
                                 <tr>
                                     <th>ゲスト名</th>
                                     <th>招待した生徒</th>
+                                    <th>生徒クラス</th>
                                     <th>ステータス</th>
                                     <th>作成日時</th>
                                 </tr>
@@ -1521,6 +1610,7 @@
                                     <tr>
                                         <td>${s.guest_name}</td>
                                         <td>${s.student_name || '—'}</td>
+                                        <td>${s.grade_class || '—'}</td>
                                         <td><span class="status-tag ${s.used ? 'status-checked-in' : 'status-pending'}">${s.used ? '入場済み' : '未使用'}</span></td>
                                         <td>${formatDateTime(s.createdAt)}</td>
                                     </tr>
@@ -1699,50 +1789,79 @@
         }
 
         function updateDashboardData(data) {
-            dom.totalCount.textContent = data.total_reservations;
+            dom.totalCount.textContent = data.total_slots;
             dom.checkedInCount.textContent = data.checked_in_count;
-            dom.pendingCount.textContent = data.pending_count;
-            dom.cancelledCount.textContent = data.cancelled_count;
+            dom.unusedCount.textContent = data.unused_count;
+            dom.studentCount.textContent = data.total_students;
 
-            const total = data.total_reservations || 1;
+            const total = data.total_slots || 1;
             dom.checkedInPercent.textContent =
                 `${Math.round(data.checked_in_count / total * 100)}%`;
-            dom.pendingPercent.textContent =
-                `${Math.round(data.pending_count / total * 100)}%`;
-            dom.cancelledPercent.textContent =
-                `${Math.round(data.cancelled_count / total * 100)}%`;
+            dom.unusedPercent.textContent =
+                `${Math.round(data.unused_count / total * 100)}%`;
 
             dom.peakTime.textContent = data.peak_time || "記録なし";
-            dom.avgCheckinTime.textContent = data.avg_checkin_time || "計測不可"; // バックエンドで実装されていないため
             dom.latestCheckin.textContent =
                 data.latest_checkin ? new Date(data.latest_checkin).toLocaleString() : "記録なし";
             dom.checkinRate.textContent =
                 `${Math.round(data.checked_in_count / total * 100)}%`;
-            dom.cancelRate.textContent =
-                `${Math.round(data.cancelled_count / total * 100)}%`;
-            dom.remainingCount.textContent = data.pending_count;
+            dom.remainingCount.textContent = data.unused_count;
+            dom.totalStudentsDetail.textContent = data.total_students;
+            dom.avgSlotsPerStudent.textContent = data.total_students > 0
+                ? (data.total_slots / data.total_students).toFixed(1)
+                : '-';
+
+            // 生徒別統計テーブル
+            if (data.student_stats && data.student_stats.length > 0) {
+                dom.studentStatsTbody.innerHTML = data.student_stats.map(st => {
+                    const rate = st.total > 0 ? Math.round(st.checkedIn / st.total * 100) : 0;
+                    return `<tr>
+                        <td>${st.name}</td>
+                        <td>${st.total}</td>
+                        <td>${st.checkedIn}</td>
+                        <td>${rate}%</td>
+                    </tr>`;
+                }).join('');
+            } else {
+                dom.studentStatsTbody.innerHTML = '<tr><td colspan="4" style="text-align:center;">データがありません</td></tr>';
+            }
+
+            // クラス別統計テーブル
+            if (data.class_stats && data.class_stats.length > 0) {
+                dom.classStatsTbody.innerHTML = data.class_stats.map(c => {
+                    const rate = c.total > 0 ? Math.round(c.checkedIn / c.total * 100) : 0;
+                    return `<tr>
+                        <td>${c.grade_class}</td>
+                        <td>${c.studentCount} 人</td>
+                        <td>${c.total}</td>
+                        <td>${c.checkedIn}</td>
+                        <td>${rate}%</td>
+                    </tr>`;
+                }).join('');
+            } else {
+                dom.classStatsTbody.innerHTML = '<tr><td colspan="5" style="text-align:center;">データがありません</td></tr>';
+            }
         }
 
         function updateDashboardCharts(data) {
             if (statusChart) statusChart.destroy();
             if (hourlyChart) hourlyChart.destroy();
             if (dailyChart) dailyChart.destroy();
+            if (classChart) classChart.destroy();
 
             statusChart = new Chart(dom.statusChartCanvas.getContext("2d"), {
                 type: "doughnut",
                 data: {
-                    labels: ["入場済み", "保留中", "キャンセル"],
+                    labels: ["入場済み", "未使用"],
                     datasets: [{
-                        data: [data.checked_in_count, data.pending_count, data.cancelled_count],
+                        data: [data.checked_in_count, data.unused_count],
                         backgroundColor: [
                             "rgba(39, 174, 96, 0.8)",
-                            "rgba(243, 156, 18, 0.8)",
-                            "rgba(231, 76, 60, 0.8)"
+                            "rgba(243, 156, 18, 0.8)"
                         ],
                         borderColor: [
                             "rgba(39, 174, 96, 1)",
-                            "rgba(243, 156, 18, 1)",
-                            "rgba(231, 76, 60, 1)"
+                            "rgba(243, 156, 18, 1)"
                         ],
                         borderWidth: 2
                     }]
@@ -1750,21 +1869,50 @@
                 options: {
                     responsive: true,
                     maintainAspectRatio: false,
+                    cutout: "70%",
                     plugins: {
-                        legend: {
-                            position: "bottom",
-                            labels: {
-                                usePointStyle: true,
-                                padding: 20,
-                                font: {
-                                    family: "Noto Sans JP"
-                                }
-                            }
-                        }
+                        legend: { position: "bottom", labels: { family: "Noto Sans JP" } },
                     }
                 }
             });
 
+            const classLabels = data.class_stats ? data.class_stats.map(c => c.grade_class) : [];
+            const classCheckedIn = data.class_stats ? data.class_stats.map(c => c.checkedIn) : [];
+            const classUnused = data.class_stats ? data.class_stats.map(c => c.total - c.checkedIn) : [];
+
+            classChart = new Chart(dom.classChartCanvas.getContext("2d"), {
+                type: "bar",
+                data: {
+                    labels: classLabels,
+                    datasets: [
+                        {
+                            label: "入場済み",
+                            data: classCheckedIn,
+                            backgroundColor: "rgba(39, 174, 96, 0.8)",
+                            borderColor: "rgba(39, 174, 96, 1)",
+                            borderWidth: 1
+                        },
+                        {
+                            label: "未使用",
+                            data: classUnused,
+                            backgroundColor: "rgba(243, 156, 18, 0.8)",
+                            borderColor: "rgba(243, 156, 18, 1)",
+                            borderWidth: 1
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        x: { stacked: true },
+                        y: { stacked: true, beginAtZero: true }
+                    },
+                    plugins: {
+                        legend: { position: 'bottom' }
+                    }
+                }
+            });
             hourlyChart = new Chart(dom.hourlyChartCanvas.getContext("2d"), {
                 type: "bar",
                 data: {
