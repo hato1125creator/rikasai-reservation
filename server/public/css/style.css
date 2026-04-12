@@ -60,6 +60,7 @@ body {
 /* Landing Page Layout */
 body.landing-page {
     display: flex;
+    flex-direction: column;
     justify-content: center;
     align-items: center;
     min-height: 100vh;
@@ -142,6 +143,12 @@ body.landing-page {
     outline: none;
     border-color: var(--color-primary);
     background-color: #FFFFFF;
+}
+
+.form-select {
+    text-overflow: ellipsis;
+    overflow: hidden;
+    white-space: nowrap;
 }
 
 /* Placeholders lighter but legible */
@@ -641,13 +648,16 @@ body.landing-page {
     transform: translate(-50%, -50%);
     background: var(--color-success);
     color: #FFFFFF;
-    font-size: 28px;
+    font-size: 24px;
     font-weight: 700;
-    padding: 40px 60px;
+    padding: 30px 20px;
     border-radius: var(--radius-lg);
     z-index: 10000;
     box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
     text-align: center;
+    width: 90%;
+    max-width: 400px;
+    box-sizing: border-box;
     animation: scaleIn 0.3s ease-out;
 }
 

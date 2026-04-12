@@ -757,8 +757,8 @@ app.post('/api/verify', authenticateToken, async (req, res, next) => {
     }
 });
 
-// 管理者: guest_slots一覧
-app.get('/api/admin/guest-slots', authenticateToken, authorizeRole(['admin']), async (req, res, next) => {
+// 管理者: guest_slots一覧 (reception, scannerも閲覧可)
+app.get('/api/admin/guest-slots', authenticateToken, authorizeRole(['admin', 'reception', 'scanner']), async (req, res, next) => {
     try {
         const slots = await GuestSlot.findAll();
         res.json({ slots });
@@ -767,8 +767,8 @@ app.get('/api/admin/guest-slots', authenticateToken, authorizeRole(['admin']), a
     }
 });
 
-// 管理者: guest_slot 手動チェックイン
-app.post('/api/admin/guest-slots/:id/check-in', authenticateToken, authorizeRole(['admin']), async (req, res, next) => {
+// 管理者: guest_slot 手動チェックイン (reception, scannerも操作可)
+app.post('/api/admin/guest-slots/:id/check-in', authenticateToken, authorizeRole(['admin', 'reception', 'scanner']), async (req, res, next) => {
     try {
         const { id } = req.params;
         const slot = await GuestSlot.findOne({ where: { id } });
@@ -818,7 +818,15 @@ app.get('/api/admin/students', authenticateToken, authorizeRole(['admin']), asyn
                 createdAt: s.createdAt,
                 totalSlots: mySlots.length,
                 usedSlots: mySlots.filter(sl => sl.used).length,
-                max_slots: s.max_guest_slots || null
+                max_slots: s.max_guest_slots || null,
+                slots: mySlots.map(sl => ({
+                    id: sl.id,
+                    guest_name: sl.guest_name,
+                    used: sl.used,
+                    checked_in_at: sl.checked_in_at,
+                    createdAt: sl.createdAt,
+                    token: sl.token
+                }))
             };
         });
         res.json({ students: result });
@@ -861,8 +869,50 @@ app.delete('/api/admin/guest-slots/:id', authenticateToken, authorizeRole(['admi
     } catch (error) { next(error); }
 });
 
-// チェックイン取り消し
-app.post('/api/admin/guest-slots/:id/uncheck-in', authenticateToken, authorizeRole(['admin']), async (req, res, next) => {
+// 管理者によるゲスト強制追加
+app.post('/api/admin/students/:id/guest-slots', authenticateToken, authorizeRole(['admin']), async (req, res, next) => {
+    try {
+        const { guest_name } = req.body;
+        if (!guest_name || guest_name.trim() === '') {
+            return res.status(400).json({ message: '名前を入力してください。' });
+        }
+
+        const student = await Student.findOne({ where: { id: req.params.id } });
+        if (!student) return res.status(404).json({ message: '生徒が見つかりません。' });
+
+        const crypto = require('crypto');
+        const token = crypto.randomBytes(24).toString('hex');
+        const slot = await GuestSlot.create({
+            id: crypto.randomBytes(8).toString('hex'),
+            token,
+            student_email: student.email,
+            student_name: student.name,
+            guest_name: guest_name.trim(), // assuming sanitization is done elsewhere or we don't strictly require escapeHtml since it's admin
+            used: false
+        });
+
+        res.json({ message: 'ゲストを追加しました。', slot });
+    } catch (error) { next(error); }
+});
+
+// 管理者によるゲスト名修正
+app.put('/api/admin/guest-slots/:id', authenticateToken, authorizeRole(['admin']), async (req, res, next) => {
+    try {
+        const { guest_name } = req.body;
+        if (!guest_name || guest_name.trim() === '') {
+            return res.status(400).json({ message: '名前を入力してください。' });
+        }
+
+        const slot = await GuestSlot.findOne({ where: { id: req.params.id } });
+        if (!slot) return res.status(404).json({ message: '指定された招待枠が見つかりません。' });
+
+        await GuestSlot.update({ guest_name: guest_name.trim() }, { where: { id: req.params.id } });
+        res.json({ message: 'ゲスト名を更新しました。' });
+    } catch (error) { next(error); }
+});
+
+// チェックイン取り消し (reception も操作可)
+app.post('/api/admin/guest-slots/:id/uncheck-in', authenticateToken, authorizeRole(['admin', 'reception']), async (req, res, next) => {
     try {
         const slot = await GuestSlot.findOne({ where: { id: req.params.id } });
         if (!slot) return res.status(404).json({ message: 'スロットが見つかりません。' });
@@ -900,6 +950,41 @@ app.post('/api/admin/change-password', authenticateToken, authorizeRole(['admin'
         const hashed = await bcrypt.hash(newPassword, 10);
         await User.update({ password: hashed }, { where: { username: req.user.username } });
         res.json({ message: 'パスワードを変更しました。' });
+    } catch (error) { next(error); }
+});
+
+// ====== アカウント管理 (admin専用) ======
+app.get('/api/admin/accounts', authenticateToken, authorizeRole(['admin']), async (req, res, next) => {
+    try {
+        const users = await User.findAll({ attributes: ['id', 'username', 'role', 'createdAt'] });
+        res.json({ accounts: users });
+    } catch (error) { next(error); }
+});
+
+app.post('/api/admin/accounts', authenticateToken, authorizeRole(['admin']), async (req, res, next) => {
+    try {
+        const { username, password, role } = req.body;
+        if (!username || !password || !role) return res.status(400).json({ message: '入力が不足しています。' });
+        
+        const existing = await User.findOne({ where: { username } });
+        if (existing) return res.status(400).json({ message: 'そのユーザー名は既に使用されています。' });
+
+        const hashed = await bcrypt.hash(password, 10);
+        await User.create({ username, password: hashed, role });
+        res.json({ message: 'アカウントを作成しました。' });
+    } catch (error) { next(error); }
+});
+
+app.delete('/api/admin/accounts/:id', authenticateToken, authorizeRole(['admin']), async (req, res, next) => {
+    try {
+        const { id } = req.params;
+        const user = await User.findByPk(id);
+        if (!user) return res.status(404).json({ message: 'アカウントが見つかりません。' });
+        if (user.username === req.user.username) {
+            return res.status(400).json({ message: '自分自身のアカウントは削除できません。' });
+        }
+        await User.destroy({ where: { id } });
+        res.json({ message: 'アカウントを削除しました。' });
     } catch (error) { next(error); }
 });
 
@@ -1229,6 +1314,45 @@ app.post('/api/student/generate-links', authenticateStudent, [
             used: slot.used,
             invite_url: inviteUrl
         });
+    } catch (error) {
+        next(error);
+    }
+});
+
+// 招待リンクの名前変更
+app.put('/api/student/guest-slots/:id', authenticateStudent, async (req, res, next) => {
+    try {
+        const { id } = req.params;
+        const { guest_name } = req.body;
+
+        if (!guest_name || guest_name.trim() === '') {
+            return res.status(400).json({ message: '名前を入力してください。' });
+        }
+
+        // 当日判定 (環境変数でカンマ区切りの日付指定を対応)
+        const festivalDatesStr = process.env.FESTIVAL_DATES || '2025-07-17,2025-07-18';
+        const festivalDates = festivalDatesStr.split(',').map(d => d.trim());
+        
+        // 日本時間での今日の日付を取得(YYYY-MM-DD形式にするためフォーマット調整)
+        const todayStr = new Intl.DateTimeFormat('ja-JP', { timeZone: 'Asia/Tokyo', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date()).replace(/\//g, '-');
+        
+        if (festivalDates.includes(todayStr)) {
+            return res.status(403).json({ message: '当日は名前の変更ができません。' });
+        }
+
+        const slot = await GuestSlot.findOne({ where: { id, student_email: req.student.email } });
+        
+        if (!slot) {
+            return res.status(404).json({ message: '指定された招待枠が見つかりません。' });
+        }
+
+        if (slot.used) {
+            return res.status(400).json({ message: '既に使用済みの招待枠は変更できません。' });
+        }
+
+        await GuestSlot.update({ guest_name: escapeHtml(guest_name.trim()) }, { where: { id } });
+
+        res.json({ message: '名前を更新しました。' });
     } catch (error) {
         next(error);
     }

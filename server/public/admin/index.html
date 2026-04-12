@@ -34,6 +34,38 @@
             </div>
         </div>
 
+        <!-- 生徒ゲスト管理モーダル -->
+        <div id="student-guests-modal" class="modal">
+            <div class="modal-background" onclick="closeStudentGuestsModal()"></div>
+            <div class="modal-content" style="max-width: 700px;">
+                <div class="glass-card">
+                    <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:1rem; gap:1rem;">
+                        <h2 class="section-title" style="margin:0; border:none; padding:0; line-height:1.4;"><span id="sgm-student-name"></span> のゲスト管理</h2>
+                        <button class="btn btn-outline" style="padding:0.4rem 0.8rem; font-size:0.8rem; width:auto; border-color:var(--color-border); color:var(--color-text-sub);" onclick="closeStudentGuestsModal()">閉じる</button>
+                    </div>
+                    
+                    <div style="display:flex; gap:0.5rem; margin-bottom: 1rem;">
+                        <input type="text" id="sgm-new-guest-name" class="form-input" placeholder="新しいゲストの名前" style="flex:1;">
+                        <button class="btn btn-primary" style="width:auto; white-space:nowrap;" onclick="adminAddGuestSlot()">追加</button>
+                    </div>
+
+                    <div style="overflow-x: auto; max-height:400px; overflow-y:auto; border: 1px solid var(--color-border); border-radius: var(--radius-md);">
+                        <table class="data-table" style="min-width: 500px;">
+                            <thead>
+                                <tr>
+                                    <th>ゲスト名</th>
+                                    <th>ステータス</th>
+                                    <th>操作</th>
+                                </tr>
+                            </thead>
+                            <tbody id="sgm-guests-tbody">
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+
         <!-- 通知エリア -->
         <div id="notification-container" style="position: fixed; top: 2rem; right: 2rem; z-index: 1000;"></div>
         <div id="checkin-notification" class="checkin-notification"></div>
@@ -263,6 +295,45 @@
                                 <input class="form-input" type="password" id="pw-confirm" placeholder="入力を再度確認">
                             </div>
                             <button class="btn btn-primary" onclick="changePassword()" style="width:100%;">パスワードを変更</button>
+                        </div>
+                        
+                        <!-- アカウント管理 -->
+                        <div class="glass-card" style="grid-column: 1 / -1;">
+                            <h2 class="section-title">👥 アカウント管理 (権限設定)</h2>
+                            <div style="display:flex; flex-wrap:wrap; gap:1rem; margin-bottom:1rem; align-items:flex-end;">
+                                <div class="form-group" style="margin-bottom:0; flex:1; min-width:150px;">
+                                    <label class="form-label">ユーザー名</label>
+                                    <input class="form-input" type="text" id="ac-new-username" autocomplete="new-password" placeholder="例: scanner1">
+                                </div>
+                                <div class="form-group" style="margin-bottom:0; flex:1; min-width:150px;">
+                                    <label class="form-label">初期パスワード</label>
+                                    <input class="form-input" type="password" id="ac-new-password" autocomplete="new-password" placeholder="8文字以上">
+                                </div>
+                                <div class="form-group" style="margin-bottom:0; flex:1; min-width:150px;">
+                                    <label class="form-label">権限 (ロール)</label>
+                                    <select class="form-select" id="ac-new-role">
+                                        <option value="admin">管理者 (全権限)</option>
+                                        <option value="reception">受付担当 (一覧＋スキャン)</option>
+                                        <option value="scanner">スキャン担当 (スキャンのみ)</option>
+                                    </select>
+                                </div>
+                                <button class="btn btn-primary" onclick="adminCreateAccount()" style="white-space:nowrap;">追加</button>
+                            </div>
+                            <div style="overflow-x:auto;">
+                                <table class="data-table">
+                                    <thead>
+                                        <tr>
+                                            <th>ユーザー名</th>
+                                            <th>権限</th>
+                                            <th>作成日時</th>
+                                            <th>操作</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="accounts-tbody">
+                                        <tr><td colspan="4" style="text-align:center;">読み込み中...</td></tr>
+                                    </tbody>
+                                </table>
+                            </div>
                         </div>
 
                         <!-- データエクスポート -->
@@ -555,6 +626,21 @@
             showNotification("セッションが期限切れです。再ログインしてください。", "warning");
         }
 
+        // JWTの安全なパース (日本語等のUTF-8文字対応)
+        function parseJwt(token) {
+            try {
+                const base64Url = token.split('.')[1];
+                if (!base64Url) return null;
+                const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+                const jsonPayload = decodeURIComponent(atob(base64).split('').map(function(c) {
+                    return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
+                }).join(''));
+                return JSON.parse(jsonPayload);
+            } catch (e) {
+                return null;
+            }
+        }
+
         // ページ初期化
         window.onload = () => {
             const token = localStorage.getItem(TOKEN_KEY);
@@ -563,7 +649,8 @@
                 dom.loginModal.classList.add("is-active");
             } else {
                 try {
-                    const payload = JSON.parse(atob(token.split(".")[1]));
+                    const payload = parseJwt(token);
+                    if (!payload) throw new Error("Invalid token payload");
                     const userRole = payload.role;
 
                     // トークン有効期限チェック
@@ -576,18 +663,33 @@
                     dom.navbar.style.display = "flex";
                     dom.mainContent.style.display = "block";
 
-                    // 学生用タブ制限
-                    if (userRole === "student") {
+                    // 権限に基づくタブ制限
+                    if (userRole === "scanner" || userRole === "student") {
                         dom.tabList.innerHTML = `
                             <li class="tab-item is-active" data-target="tab-qr">
-                                <a class="tab-link">QRコード読み取り</a>
+                                <a class="tab-link">📷 QRスキャン</a>
                             </li>
                         `;
-
                         document.querySelectorAll(".tab-content").forEach((item) => {
                             if (item.id !== "tab-qr") {
                                 item.classList.add("is-hidden");
                             } else {
+                                item.classList.remove("is-hidden");
+                            }
+                        });
+                    } else if (userRole === "reception") {
+                        dom.tabList.innerHTML = `
+                            <li class="tab-item" data-target="tab-overview">
+                                <a class="tab-link">🎫 ゲスト一覧</a>
+                            </li>
+                            <li class="tab-item is-active" data-target="tab-qr">
+                                <a class="tab-link">📷 QRスキャン</a>
+                            </li>
+                        `;
+                        document.querySelectorAll(".tab-content").forEach((item) => {
+                            if (item.id !== "tab-qr" && item.id !== "tab-overview") {
+                                item.classList.add("is-hidden");
+                            } else if (item.id === "tab-qr") {
                                 item.classList.remove("is-hidden");
                             }
                         });
@@ -714,7 +816,6 @@
             notificationDiv.textContent = message;
             dom.notificationContainer.appendChild(notificationDiv);
 
-            // アニメーション
             setTimeout(() => {
                 notificationDiv.classList.add("is-visible");
             }, 10);
@@ -727,8 +828,13 @@
             }, NOTIFICATION_DISPLAY_TIME_MS);
         }
 
-        function showCheckinNotification(message) {
+        function showCheckinNotification(message, isError = false) {
             dom.checkinNotification.textContent = message;
+            if (isError) {
+                dom.checkinNotification.style.backgroundColor = 'var(--color-error)';
+            } else {
+                dom.checkinNotification.style.backgroundColor = 'var(--color-success)';
+            }
             dom.checkinNotification.style.display = "block";
             setTimeout(() => {
                 dom.checkinNotification.style.display = "none";
@@ -763,6 +869,14 @@
         }
 
         function startQrScanner() {
+            // iOS等での音声再生制限解除（ユーザーアクション起点で一度再生する）
+            dom.successSound.play().catch(()=>{});
+            dom.successSound.pause();
+            dom.successSound.currentTime = 0;
+            dom.errorSound.play().catch(()=>{});
+            dom.errorSound.pause();
+            dom.errorSound.currentTime = 0;
+
             const cameraId = dom.cameraSelect.value;
             if (!cameraId) {
                 showNotification("カメラが選択されていません。", "warning");
@@ -852,8 +966,8 @@
                     updateReservations();
                 } else if (data.message === '既に入場済みです。') {
                     displayReservationDetails(data);
-                    showCheckinNotification('既に入場済みです');
-                    playSuccessSound();
+                    showCheckinNotification('既に入場済みです', true);
+                    playErrorSound();
                 } else {
                     showNotification(data.message || '確認できませんでした', 'error');
                     dom.scanResultDiv.className = 'scan-result error';
@@ -1027,6 +1141,13 @@
                 document.getElementById('si-checkedin').textContent = d.checkedInSlots + ' 件';
                 document.getElementById('si-slots-per-student').textContent = d.guestSlotsPerStudent + ' 枠';
             } catch { showNotification('設定の取得に失敗しました。', 'error'); }
+
+            try {
+                const payload = parseJwt(localStorage.getItem(TOKEN_KEY));
+                if (payload && payload.role === 'admin') {
+                    loadAccounts();
+                }
+            } catch(e) {}
         }
 
         async function changePassword() {
@@ -1123,6 +1244,7 @@
                             <td style="text-align:center;"><span class="status-tag status-checked-in">${usedCountMap[s.email] || 0} 人</span></td>
                             <td style="font-size:0.85rem;">${formatDateTime(s.createdAt)}</td>
                             <td style="white-space:nowrap;">
+                                <button class="btn btn-primary" style="font-size:0.75rem;padding:0.3rem 0.6rem;margin-right:0.3rem;" onclick="openStudentGuestsModal('${s.id}', '${s.name}')">👤 ゲスト詳細</button>
                                 <button class="btn btn-outline" style="font-size:0.75rem;padding:0.3rem 0.6rem;margin-right:0.3rem;" onclick="editStudent('${s.id}', '${s.name}', '${s.max_slots === null ? '' : s.max_slots}')">編集</button>
                                 <button class="btn btn-danger" style="font-size:0.75rem;padding:0.3rem 0.6rem;" onclick="deleteStudent('${s.id}', '${s.name}')">削除</button>
                             </td>
@@ -1184,6 +1306,178 @@
                 showNotification(data.message, res.ok ? 'success' : 'error');
                 if (res.ok) loadStudentList();
             } catch (e) { showNotification('削除に失敗しました。', 'error'); }
+        }
+
+        // === 生徒ゲスト管理モーダル ===
+        let currentSgmStudentId = null;
+
+        function closeStudentGuestsModal() {
+            document.getElementById('student-guests-modal').classList.remove('is-active');
+        }
+
+        function openStudentGuestsModal(studentId, studentName) {
+            currentSgmStudentId = studentId;
+            document.getElementById('sgm-student-name').textContent = studentName;
+            renderStudentGuestsModal();
+            document.getElementById('student-guests-modal').classList.add('is-active');
+        }
+
+        async function renderStudentGuestsModal() {
+            const tbody = document.getElementById('sgm-guests-tbody');
+            tbody.innerHTML = '<tr><td colspan="3" style="text-align:center;">読み込み中...</td></tr>';
+            try {
+                const res = await authFetch(`${API_BASE_URL}/api/admin/students`);
+                if (!res.ok) throw new Error();
+                const { students } = await res.json();
+                const student = students.find(s => s.id === currentSgmStudentId);
+                
+                if (!student) {
+                    tbody.innerHTML = '<tr><td colspan="3" style="text-align:center;">生徒が見つかりません</td></tr>';
+                    return;
+                }
+                const slots = student.slots || [];
+                if (slots.length === 0) {
+                    tbody.innerHTML = '<tr><td colspan="3" style="text-align:center;">紐づく招待ゲストはいません</td></tr>';
+                    return;
+                }
+                
+                const origin = window.location.origin;
+                tbody.innerHTML = slots.map(sl => {
+                    const guestUrl = `${origin}/guest/?token=${sl.token}`;
+                    return `
+                        <tr>
+                            <td><strong>${sl.guest_name}</strong></td>
+                            <td><span class="status-tag ${sl.used ? 'status-checked-in' : 'status-pending'}">${sl.used ? '✅ 入場済' : '⏳ 未使用'}</span></td>
+                            <td>
+                                <div style="display:flex;gap:0.4rem;flex-wrap:wrap;">
+                                    <button class="btn btn-outline" style="font-size:0.75rem;padding:0.3rem 0.6rem;" onclick="copyGuestUrl('${guestUrl}')">URL</button>
+                                    <button class="btn btn-outline" style="font-size:0.75rem;padding:0.3rem 0.6rem;" onclick="adminEditGuestSlot('${sl.id}', '${sl.guest_name.replace(/'/g, "\\'")}')">編集</button>
+                                    <button class="btn btn-danger" style="font-size:0.75rem;padding:0.3rem 0.6rem;" onclick="adminDeleteGuestSlot('${sl.id}', '${sl.guest_name.replace(/'/g, "\\'")}')">削除</button>
+                                </div>
+                            </td>
+                        </tr>
+                    `;
+                }).join('');
+            } catch (e) {
+                tbody.innerHTML = '<tr><td colspan="3" style="text-align:center; color:red;">情報の取得に失敗しました</td></tr>';
+            }
+        }
+
+        async function adminAddGuestSlot() {
+            const input = document.getElementById('sgm-new-guest-name');
+            const name = input.value.trim();
+            if(!name) {
+                showNotification('ゲスト名を入力してください。', 'warning');
+                return;
+            }
+            try {
+                const res = await authFetch(`${API_BASE_URL}/api/admin/students/${currentSgmStudentId}/guest-slots`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ guest_name: name })
+                });
+                const data = await res.json();
+                showNotification(data.message, res.ok ? 'success' : 'error');
+                if (res.ok) {
+                    input.value = '';
+                    renderStudentGuestsModal();
+                    loadStudentList(); // background update
+                }
+            } catch (e) {
+                showNotification('ゲストの追加に失敗しました。', 'error');
+            }
+        }
+
+        async function adminEditGuestSlot(slotId, currentName) {
+            const newName = prompt('ゲスト名を編集します:', currentName);
+            if(newName === null || newName.trim() === '') return;
+            try {
+                const res = await authFetch(`${API_BASE_URL}/api/admin/guest-slots/${slotId}`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ guest_name: newName })
+                });
+                const data = await res.json();
+                showNotification(data.message, res.ok ? 'success' : 'error');
+                if (res.ok) {
+                    renderStudentGuestsModal();
+                    loadStudentList();
+                }
+            } catch (e) {
+                showNotification('ゲスト名の変更に失敗しました。', 'error');
+            }
+        }
+
+        async function adminDeleteGuestSlot(slotId, guestName) {
+            if(!confirm(`ゲスト「${guestName}」の招待枠を削除しますか？\n（チェックイン済みの場合は入場記録も消えます）`)) return;
+            try {
+                const res = await authFetch(`${API_BASE_URL}/api/admin/guest-slots/${slotId}`, { method: 'DELETE' });
+                const data = await res.json();
+                showNotification(data.message, res.ok ? 'success' : 'error');
+                if (res.ok) {
+                    renderStudentGuestsModal();
+                    loadStudentList();
+                }
+            } catch (e) {
+                showNotification('ゲストの削除に失敗しました。', 'error');
+            }
+        }
+
+        // === アカウント管理 ===
+        async function loadAccounts() {
+            const tbody = document.getElementById('accounts-tbody');
+            if(!tbody) return;
+            try {
+                const res = await authFetch(`${API_BASE_URL}/api/admin/accounts`);
+                if(!res.ok) throw new Error();
+                const data = await res.json();
+                const roleLabels = { 'admin': '👑 管理者', 'reception': '📝 受付担当', 'scanner': '📷 スキャン担当', 'guest': '一般' };
+                tbody.innerHTML = data.accounts.map(a => `
+                    <tr>
+                        <td><strong>${a.username}</strong></td>
+                        <td>${roleLabels[a.role] || a.role}</td>
+                        <td>${formatDateTime(a.createdAt)}</td>
+                        <td>
+                            <button class="btn btn-danger" style="font-size:0.75rem;padding:0.3rem 0.6rem;" onclick="adminDeleteAccount('${a.id}', '${a.username}')">削除</button>
+                        </td>
+                    </tr>
+                `).join('');
+            } catch(e) {
+                tbody.innerHTML = '<tr><td colspan="4" style="text-align:center;color:red;">取得失敗</td></tr>';
+            }
+        }
+
+        async function adminCreateAccount() {
+            const username = document.getElementById('ac-new-username').value.trim();
+            const password = document.getElementById('ac-new-password').value;
+            const role = document.getElementById('ac-new-role').value;
+            if(!username || !password) return showNotification('ユーザー名とパスワードを入力してください', 'warning');
+            if(password.length < 8) return showNotification('パスワードは8文字以上です', 'warning');
+
+            try {
+                const res = await authFetch(`${API_BASE_URL}/api/admin/accounts`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ username, password, role })
+                });
+                const data = await res.json();
+                showNotification(data.message, res.ok ? 'success' : 'error');
+                if(res.ok) {
+                    document.getElementById('ac-new-username').value = '';
+                    document.getElementById('ac-new-password').value = '';
+                    loadAccounts();
+                }
+            } catch(e) { showNotification('アカウント作成に失敗しました', 'error'); }
+        }
+
+        async function adminDeleteAccount(id, username) {
+            if(!confirm(`アカウント「${username}」を削除しますか？`)) return;
+            try {
+                const res = await authFetch(`${API_BASE_URL}/api/admin/accounts/${id}`, { method: 'DELETE' });
+                const data = await res.json();
+                showNotification(data.message, res.ok ? 'success' : 'error');
+                if(res.ok) loadAccounts();
+            } catch(e) { showNotification('アカウント削除に失敗しました', 'error'); }
         }
 
         // === ゲスト検索 ===

@@ -143,12 +143,12 @@
 
         <!-- ===== ダッシュボード ===== -->
         <div id="page-dashboard" style="display:none;">
-            <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:1.25rem;">
-                <div>
-                    <h1 class="title" style="font-size: 1.4rem; margin:0;">梨花祭2025</h1>
-                    <p id="dash-name" style="color: var(--color-text-sub); margin:0; font-size:0.9rem;"></p>
+            <div style="display:flex; align-items:flex-start; justify-content:space-between; margin-bottom:1.25rem; gap: 1rem;">
+                <div style="flex: 1; word-wrap: break-word;">
+                    <h1 class="title" style="font-size: 1.4rem; margin:0; text-align: left;">梨花祭2025</h1>
+                    <p id="dash-name" style="color: var(--color-text-sub); margin:0; font-size:0.9rem; line-height: 1.4;"></p>
                 </div>
-                <button class="btn" style="padding: 0.4rem 0.85rem; font-size:0.8rem; background: var(--color-bg); color: var(--color-text-sub);" onclick="logout()">ログアウト</button>
+                <button class="btn" style="padding: 0.4rem 0.85rem; font-size:0.8rem; background: var(--color-bg); color: var(--color-text-sub); flex-shrink: 0; width: auto;" onclick="logout()">ログアウト</button>
             </div>
 
             <p class="subtitle" style="text-align:left; margin-bottom: 0.5rem;">招待リンク管理</p>
@@ -364,7 +364,10 @@
                 div.className = 'slot-card';
                 div.innerHTML = `
                     <div class="slot-info">
-                        <div class="slot-name">${escHtml(slot.guest_name)}</div>
+                        <div style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.25rem;">
+                            <div class="slot-name" style="margin-bottom: 0;">${escHtml(slot.guest_name)}</div>
+                            ${!slot.used ? `<button class="btn" style="padding: 0.1rem 0.4rem; font-size: 0.7rem; background: var(--color-primary); color: white;" onclick="editGuestName('${slot.id}', '${escHtml(slot.guest_name)}')">編集</button>` : ''}
+                        </div>
                         <div class="slot-status ${slot.used ? 'used' : 'unused'}">
                             ${slot.used ? '✅ 使用済み' : '⬜ 未使用'}
                         </div>
@@ -429,6 +432,32 @@
             }
         }
 
+        // ===== 名前編集 =====
+        async function editGuestName(id, currentName) {
+            const newName = prompt('新しい名前を入力してください:', currentName);
+            if (newName !== null && newName.trim() !== '' && newName !== currentName) {
+                try {
+                    const res = await fetch(`/api/student/guest-slots/${id}`, {
+                        method: 'PUT',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'Authorization': `Bearer ${studentToken}`
+                        },
+                        body: JSON.stringify({ guest_name: newName.trim() })
+                    });
+                    const data = await res.json();
+                    
+                    if (res.ok) {
+                        await loadDashboard();
+                    } else {
+                        alert(data.message || '更新に失敗しました。');
+                    }
+                } catch (e) {
+                    alert('サーバーエラーが発生しました。');
+                }
+            }
+        }
+
         // ===== コピー =====
         async function copyLink(url, idx) {
             try {
@@ -457,6 +486,11 @@
                 document.getElementById('form-login').style.display = 'none';
                 document.getElementById('form-register').style.display = 'none';
                 document.getElementById('step-otp').style.display = 'none';
+            } else {
+                if (document.getElementById('step-otp').style.display === 'none' && document.getElementById('page-dashboard').style.display === 'none') {
+                    document.getElementById('form-login').style.display = currentTab === 'login' ? 'block' : 'none';
+                    document.getElementById('form-register').style.display = currentTab === 'register' ? 'block' : 'none';
+                }
             }
         }
 
