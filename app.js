@@ -48,28 +48,26 @@ app.use(helmet({
 
 // レート制限 (全体)
 const generalLimiter = rateLimit({
-    windowMs: 15 * 60 * 1000, // 15分
-    max: 100, // 15分あたり100リクエストまで
-    message: { message: 'リクエスト数が制限を超えました。しばらくしてから再度お試しください。' },
-    standardHeaders: true,
-    legacyHeaders: false
+    windowMs: 15 * 60 * 1000,
+    max: 2000, 
+    message: { message: 'リクエストが多すぎます。しばらくしてから再度お試しください。' }
 });
 app.use('/api/', generalLimiter);
 
-// ログイン用レート制限 (ブルートフォース対策)
+// ログイン用レート制限
 const loginLimiter = rateLimit({
     windowMs: 15 * 60 * 1000,
-    max: 5, // 15分あたり5回まで
-    message: { message: 'ログイン試行回数が上限に達しました。15分後に再度お試しください。' },
+    max: 100, 
+    message: { message: 'ログイン試行回数が上限に達しました。しばらくしてから再度お試しください。' },
     standardHeaders: true,
     legacyHeaders: false
 });
 
-// OTP用レート制限 (1メールアドレスあたり5分に1回)
+// OTP用レート制限
 const otpLimiter = rateLimit({
     windowMs: 5 * 60 * 1000,
-    max: 3,
-    message: { message: 'OTP送信回数が上限に達しました。5分後に再度お試しください。' },
+    max: 50,
+    message: { message: 'OTP送信回数が上限に達しました。しばらくしてから再度お試しください。' },
     standardHeaders: true,
     legacyHeaders: false
 });
@@ -94,7 +92,11 @@ app.use('/student', express.static(path.join(__dirname, 'server/public/student')
 app.use(express.static(path.join(__dirname, 'server/public')));
 
 // DB initialization (PostgreSQL)
-const { sequelize, User, InviteCode, Reservation, Student, GuestSlot, Op } = require('./server/db-postgres');
+const { sequelize, User, Student, GuestSlot, Op } = require('./server/db-postgres');
+
+// テスト用グローバル設定
+let isFixedOtpMode = false;
+const TEST_FIXED_OTP = '123456';
 
 // データベース同期 (自動でテーブルを作成/変更)
 sequelize.sync({ alter: true })
@@ -234,17 +236,8 @@ async function generateQRCodeDataURL(qrData) {
     return await QRCode.toDataURL(qrData);
 }
 
-// 招待コード正規化関数（全角半角、スペース、大文字小文字の違いを吸収）
-const normalizeCode = (code) => {
-    if (!code) return '';
-    return code
-        .replace(/[Ａ-Ｚａ-ｚ０-９]/g, s => String.fromCharCode(s.charCodeAt(0) - 0xFEE0))
-        .replace(/[−ー—‐]/g, '-')
-        .replace(/[\s\u200B]+/g, '')
-        .toLowerCase();
-};
-
-// ルート定義
+// ダッシュボード等で使用する共通関数
+// (以前の招待コード生成関数などは削除済み)
 
 // ログインエンドポイント (レート制限付き)
 app.post('/api/login', loginLimiter, async (req, res, next) => {
@@ -256,377 +249,12 @@ app.post('/api/login', loginLimiter, async (req, res, next) => {
             const token = jwt.sign(
                 { id: user.id, username: user.username, role: user.role },
                 process.env.JWT_SECRET,
-                { expiresIn: '1h' } // トークンの有効期限を設定
+                { expiresIn: '4h' }
             );
             res.json({ success: true, token });
         } else {
             res.status(401).json({ success: false, message: '無効な資格情報' });
         }
-    } catch (error) {
-        next(error);
-    }
-});
-
-// 招待コード検証エンドポイント
-app.post('/api/validate-invite-code', [body('inviteCode').isString().notEmpty()], async (req, res, next) => {
-    try {
-        const errors = validationResult(req);
-        if (!errors.isEmpty()) {
-            return res.status(400).json({ errors: errors.array() });
-        }
-
-        const { inviteCode } = req.body;
-
-        // 正規化して使用可能なコードを検索
-        const normalizedInput = normalizeCode(inviteCode);
-        const allCodes = await InviteCode.findAll({ where: { used: false } });
-        const invite = allCodes.find(c => normalizeCode(c.code) === normalizedInput);
-
-        if (!invite) {
-            return res.json({ valid: false });
-        }
-
-        // 検証のみ行い、使用済みにはしない。DBの正確なコードを返す。
-        res.json({ valid: true, normalizedCode: invite.code });
-    } catch (error) {
-        next(error);
-    }
-});
-
-
-// 予約エンドポイント
-app.post('/api/reserve', [
-    body('name').isString().notEmpty().withMessage('Name is required'),
-    body('contact').isEmail().withMessage('Valid email is required'),
-    body('relationship').isString().notEmpty().withMessage('Relationship is required'),
-    body('invite-code').isString().notEmpty().withMessage('Invite code is required'),
-], async (req, res, next) => {
-    const transaction = await sequelize.transaction(); // トランザクション開始
-    try {
-        const errors = validationResult(req);
-        if (!errors.isEmpty()) {
-            await transaction.rollback();
-            return res.status(400).json({ errors: errors.array() });
-        }
-
-        const { name, contact, relationship, 'invite-code': inviteCode } = req.body;
-
-        const normalizedInput = normalizeCode(inviteCode);
-        const allCodes = await InviteCode.findAll({ where: { used: false } });
-        const invite = allCodes.find(c => normalizeCode(c.code) === normalizedInput);
-
-        if (!invite) {
-            await transaction.rollback();
-            return res.status(400).json({ message: '無効な招待コード、または既に使用済みです。' });
-        }
-        
-        const exactInviteCode = invite.code;
-
-        let reservationId;
-        let isUnique = false;
-        while (!isUnique) {
-            const min = 100000;
-            const max = 999999;
-            reservationId = Math.floor(Math.random() * (max - min + 1)) + min;
-            const existingReservation = await Reservation.findByPk(reservationId, { transaction });
-            if (!existingReservation) {
-                isUnique = true;
-            }
-        }
-
-        const reservation = await Reservation.create({
-            id: reservationId,
-            name, contact, relationship, invite_code: exactInviteCode
-        }, { transaction });
-
-        await InviteCode.update({ used: true }, { where: { code: exactInviteCode }, transaction });
-
-        const qrData = `${process.env.FRONTEND_URL || `http://localhost:${port}`}/guest/verify?id=${reservationId}`;
-        const qrCodeDataURL = await generateQRCodeDataURL(qrData);
-
-        // 先にトランザクションをコミット（DBの整合性を確保）
-        await transaction.commit();
-
-        // メール送信（トランザクション外で実行 — 失敗しても予約は保持される）
-        const safeName = escapeHtml(name);
-        const safeContact = escapeHtml(contact);
-        const safeRelationship = escapeHtml(relationship);
-        const safeInviteCode = escapeHtml(exactInviteCode);
-
-        const mailOptions = {
-            to: contact,
-            subject: '梨花祭2025予約完了のお知らせ',
-            html: `
-                <p>${safeName} 様</p>
-                <p>梨花祭2025へのご予約が完了しました。以下の詳細をご確認ください。</p>
-                <ul>
-                    <li>予約者名: ${safeName}</li>
-                    <li>メールアドレス: ${safeContact}</li>
-                    <li>人数: ${safeRelationship}</li>
-                    <li>招待コード: ${safeInviteCode}</li>
-                </ul>
-                <p>ご参加をお待ちしております。</p>
-                <p>—————————————————</p>
-                <p>下記に入場用QRコードを添付いたします。<br>
-                当日受付にて、こちらのQRコードをご提示ください。</p>
-                <br>
-                <img src="cid:entry_qrcode" alt="入場用QRコード" style="width: 200px; height: 200px; border: 1px solid #ddd;"/>
-                <br><br>
-                <p>開催日時：2025年6月◯日（土）9時00分～14時00分</p>
-                <p>開催場所：千葉英和高等学校</p>
-                <p>住所：〒276-0028 千葉県八千代市村上709-1</p>
-                <p>—————————————————</p>
-            `,
-            attachments: [{
-                filename: 'qrcode.png',
-                content: qrCodeDataURL.split(';base64,').pop(),
-                encoding: 'base64',
-                cid: 'entry_qrcode'
-            }]
-        };
-
-        try {
-            await sendEmailWithFailover(mailOptions);
-        } catch (emailError) {
-            console.error('メール送信に失敗しましたが、予約は完了しています:', emailError.message);
-        }
-
-        res.json({ message: 'Reservation completed', id: reservationId });
-    } catch (error) {
-        // コミット前のエラーの場合のみロールバック
-        try { await transaction.rollback(); } catch (rbErr) { /* already committed */ }
-        next(error);
-    }
-});
-
-// 予約ステータス更新エンドポイント (管理者のみ)
-app.post('/api/reservations/:id', authenticateToken, authorizeRole(['admin']), [
-    body('status').isString().isIn(['pending', 'checked-in', 'cancelled']).withMessage('Invalid status'),
-], async (req, res, next) => {
-    try {
-        const errors = validationResult(req);
-        if (!errors.isEmpty()) {
-            return res.status(400).json({ errors: errors.array() });
-        }
-
-        const { status } = req.body;
-        const { id } = req.params;
-
-        const reservation = await Reservation.findByPk(id);
-        if (reservation) {
-            if (reservation.status !== 'cancelled' && status === 'cancelled') {
-                await InviteCode.update({ used: false }, { where: { code: reservation.invite_code } });
-            } else if (reservation.status === 'cancelled' && status !== 'cancelled') {
-                await InviteCode.update({ used: true }, { where: { code: reservation.invite_code } });
-            }
-        }
-
-        const [affectedRows] = await Reservation.update({ status }, { where: { id } });
-
-        if (affectedRows > 0) {
-            res.json({ message: 'ステータスが更新されました' });
-        } else {
-            res.status(404).json({ message: '指定された予約が見つかりません' });
-        }
-    } catch (error) {
-        next(error);
-    }
-});
-
-// 予約履歴取得エンドポイント (管理者のみ)
-app.get('/api/reservations/history', authenticateToken, authorizeRole(['admin']), async (req, res, next) => {
-    try {
-        const reservations = await Reservation.findAll({
-            where: { status: { [Op.in]: ['checked-in', 'cancelled'] } },
-            order: [['updatedAt', 'DESC']] // Sequelizeではupdated_atはupdatedAtとなる
-        });
-        res.json(reservations);
-    } catch (error) {
-        next(error);
-    }
-});
-
-// 予約データ取得エンドポイント (管理者のみ)
-app.get('/api/reservations', authenticateToken, authorizeRole(['admin']), async (req, res, next) => {
-    try {
-        const { status } = req.query;
-        const whereClause = status ? { status } : {};
-        const reservations = await Reservation.findAll({ where: whereClause });
-
-        // QRコードをBase64でエンコードして返す
-        const reservationsWithQr = await Promise.all(reservations.map(async (r) => {
-            const qrData = `${process.env.FRONTEND_URL || `http://localhost:${port}`}/guest/verify?id=${r.id}`;
-            const qrCodeDataURL = await generateQRCodeDataURL(qrData);
-            return { ...r.toJSON(), qr_code_data_url: qrCodeDataURL };
-        }));
-
-        res.json(reservationsWithQr);
-    } catch (error) {
-        next(error);
-    }
-});
-
-// 共通関数: ユニークコード生成
-function generateUniqueCode(prefix1, prefix2, name, type, existingSet) {
-    let code;
-    do {
-        const randomPart = crypto.randomBytes(4).toString('hex'); // 8文字の16進数
-        code = `${prefix1}-${prefix2}-${name}-${type}-${randomPart}`;
-    } while (existingSet.has(code));
-    existingSet.add(code);
-    return code;
-}
-
-// 招待コードテンプレートダウンロード (管理者のみ)
-app.get('/api/download-template', authenticateToken, authorizeRole(['admin']), (req, res) => {
-    const csvContent = '名前,連絡先,備考\n山田 太郎,email@example.com,保護者\n鈴木 次郎,,ゲスト';
-    res.setHeader('Content-Type', 'text/csv');
-    res.setHeader('Content-Disposition', 'attachment; filename=invite_code_template.csv');
-    res.send(csvContent);
-});
-
-// 招待コード個別生成 (管理者のみ)
-app.post('/api/generate-individual-invite-code', authenticateToken, authorizeRole(['admin']), async (req, res, next) => {
-    try {
-        const { name, prefixPart1, prefixPart2 } = req.body;
-
-        if (!name || !prefixPart1 || !prefixPart2) {
-            return res.status(400).json({ error: '名前とクラス情報は必須です。' });
-        }
-
-        const codesToInsert = [];
-        const existingCodesSet = new Set();
-
-        // 既存コード取得
-        const existingDbCodes = await InviteCode.findAll({ attributes: ['code'] });
-        existingDbCodes.forEach(ic => existingCodesSet.add(ic.code));
-
-        // 生成
-        const guardianCode = generateUniqueCode(prefixPart1, prefixPart2, name, '保護者', existingCodesSet);
-        codesToInsert.push({ code: guardianCode, used: false, name });
-
-        for (let i = 0; i < 3; i++) {
-            const guestCode = generateUniqueCode(prefixPart1, prefixPart2, name, 'ゲスト', existingCodesSet);
-            codesToInsert.push({ code: guestCode, used: false, name });
-        }
-
-        await InviteCode.bulkCreate(codesToInsert);
-
-        res.json({ message: '招待コードが生成されました', codes: codesToInsert });
-    } catch (error) {
-        next(error);
-    }
-});
-
-// 招待コード一括生成 (管理者のみ)
-app.post(
-    '/api/generate-invite-codes',
-    authenticateToken,
-    authorizeRole(['admin']),
-    multer({ dest: require('os').tmpdir() }).single('csvFile'),
-    async (req, res, next) => {
-        if (!req.file) {
-            return res.status(400).json({ error: 'CSVファイルが必要です。' });
-        }
-
-        const { prefixPart1, prefixPart2 } = req.body;
-        if (!prefixPart1 || !prefixPart2) {
-            fs.unlinkSync(req.file.path);
-            return res.status(400).json({ error: 'コードプレフィックスが必要です。' });
-        }
-
-        const filePath = req.file.path;
-        const codesToInsert = [];
-        const existingCodesSet = new Set();
-
-        const transaction = await sequelize.transaction();
-
-        try {
-            // CSV 読み込み
-            const names = [];
-            await new Promise((resolve, reject) => {
-                fs.createReadStream(filePath)
-                    .pipe(csvParser())
-                    .on('data', (row) => {
-                        // カラム名の揺らぎに対応
-                        const name = row['名前'] || row['name'] || row['Name'] || Object.values(row)[0];
-                        if (name) names.push(name.trim());
-                    })
-                    .on('end', resolve)
-                    .on('error', reject);
-            });
-
-            // 既存コードをセットに追加
-            const existingDbCodes = await InviteCode.findAll({ attributes: ['code'], transaction });
-            existingDbCodes.forEach(ic => existingCodesSet.add(ic.code));
-
-            // コード生成
-            for (const name of names) {
-                // 保護者コード
-                const guardianCode = generateUniqueCode(prefixPart1, prefixPart2, name, '保護者', existingCodesSet);
-                codesToInsert.push({ code: guardianCode, used: false, name });
-
-                // ゲストコード 3つ
-                for (let i = 0; i < 3; i++) {
-                    const guestCode = generateUniqueCode(prefixPart1, prefixPart2, name, 'ゲスト', existingCodesSet);
-                    codesToInsert.push({ code: guestCode, used: false, name });
-                }
-            }
-
-            // DB にバルク登録
-            await InviteCode.bulkCreate(codesToInsert, { transaction });
-            await transaction.commit();
-
-            // CSV 出力
-            const tmpFileName = require('path').join(require('os').tmpdir(), `generated_invite_codes_${Date.now()}.csv`);
-            const csvWriter = createCsvWriter({
-                path: tmpFileName,
-                header: [
-                    { id: 'code', title: 'Code' },
-                    { id: 'name', title: 'Name' } // 名前も出力
-                ]
-            });
-            await csvWriter.writeRecords(codesToInsert);
-
-            // ダウンロード
-            res.download(tmpFileName, () => {
-                try {
-                    if (fs.existsSync(tmpFileName)) fs.unlinkSync(tmpFileName);
-                    if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
-                } catch (e) {
-                    console.error('Failed to unlink temporary files:', e);
-                }
-            });
-
-        } catch (error) {
-            await transaction.rollback();
-            fs.unlinkSync(filePath);
-            next(error);
-        }
-    }
-);
-
-// 検索エンドポイント (管理者のみ)
-app.get('/api/search', authenticateToken, authorizeRole(['admin']), async (req, res, next) => {
-    try {
-        const { q } = req.query;
-
-        if (!q || q.trim() === '') {
-            return res.status(400).json({ error: '検索クエリが必要です。' });
-        }
-
-        const searchResults = await Reservation.findAll({
-            where: {
-                [Op.or]: [
-                    { name: { [Op.like]: `%${q}%` } },
-                    { contact: { [Op.like]: `%${q}%` } },
-                    { id: q }, // IDは完全一致で検索
-                    { invite_code: { [Op.like]: `%${q}%` } }
-                ]
-            }
-        });
-
-        res.json(searchResults);
     } catch (error) {
         next(error);
     }
@@ -719,44 +347,32 @@ app.get('/api/report', authenticateToken, authorizeRole(['admin']), async (req, 
     }
 });
 
-// QRコード検証エンドポイント (認証必須) - token方式・id方式両対応
+// QRコード検証エンドポイント (認証必須)
 app.post('/api/verify', authenticateToken, async (req, res, next) => {
     try {
         const { qrData } = req.body;
         let token = null;
-        let reservationId = null;
 
         try {
             const url = new URL(qrData);
             token = url.searchParams.get('token');
-            reservationId = url.searchParams.get('id');
         } catch (e) {
             return res.status(400).json({ message: '無効なQRコードデータです。' });
         }
 
-        // ===== 新方式: guest_slot token =====
-        if (token) {
-            const slot = await GuestSlot.findOne({ where: { token } });
+        if (!token) {
+            return res.status(400).json({ message: 'QRコードに有効なトークンが含まれていません。' });
+        }
 
-            if (!slot) {
-                return res.status(404).json({ message: '招待リンクが見つかりません。' });
-            }
+        const slot = await GuestSlot.findOne({ where: { token } });
 
-            if (slot.used) {
-                return res.json({
-                    message: '既に入場済みです。',
-                    slot: {
-                        guest_name: slot.guest_name,
-                        student_name: slot.student_name,
-                        status: 'checked-in'
-                    }
-                });
-            }
+        if (!slot) {
+            return res.status(404).json({ message: '招待リンクが見つかりません。' });
+        }
 
-            await GuestSlot.update({ used: true, checked_in_at: new Date().toISOString() }, { where: { token } });
-
+        if (slot.used) {
             return res.json({
-                message: '入場が承認されました。',
+                message: '既に入場済みです。',
                 slot: {
                     guest_name: slot.guest_name,
                     student_name: slot.student_name,
@@ -765,24 +381,16 @@ app.post('/api/verify', authenticateToken, async (req, res, next) => {
             });
         }
 
-        // ===== 旧方式: reservation id（後方互換）=====
-        if (reservationId) {
-            const reservation = await Reservation.findByPk(reservationId);
+        await GuestSlot.update({ used: true, checked_in_at: new Date().toISOString() }, { where: { token } });
 
-            if (!reservation) {
-                return res.status(404).json({ message: '予約が見つかりません。' });
+        return res.json({
+            message: '入場が承認されました。',
+            slot: {
+                guest_name: slot.guest_name,
+                student_name: slot.student_name,
+                status: 'checked-in'
             }
-
-            if (reservation.status === 'checked-in') {
-                return res.json({ message: '既に入場済みです。', reservation });
-            }
-
-            await reservation.update({ status: 'checked-in' });
-            return res.json({ message: '入場が承認されました。', reservation });
-        }
-
-        return res.status(400).json({ message: 'QRコードに有効なトークンまたはIDが含まれていません。' });
-
+        });
     } catch (error) {
         next(error);
     }
@@ -820,26 +428,7 @@ app.post('/api/admin/guest-slots/:id/check-in', authenticateToken, authorizeRole
 });
 
 
-app.delete('/api/reservations/:id', authenticateToken, authorizeRole(['admin']), async (req, res, next) => {
-    try {
-        const { id } = req.params;
-
-        const reservation = await Reservation.findByPk(id);
-        if (reservation && reservation.status !== 'cancelled') {
-            await InviteCode.update({ used: false }, { where: { code: reservation.invite_code } });
-        }
-
-        const deletedRows = await Reservation.destroy({ where: { id } });
-
-        if (deletedRows > 0) {
-            res.json({ message: '予約が削除されました。' });
-        } else {
-            res.status(404).json({ message: '指定された予約が見つかりません。' });
-        }
-    } catch (error) {
-        next(error);
-    }
-});
+// (以前の予約削除エンドポイントなどは削除済み)
 
 // ===== 拡張管理者API =====
 
@@ -1084,6 +673,51 @@ app.get('/api/export-report', authenticateToken, authorizeRole(['admin']), async
     }
 });
 
+// ===== テスト支援機能 API (管理者のみ) =====
+
+
+// データ削除
+app.post('/api/admin/test/clear', authenticateToken, authorizeRole(['admin']), async (req, res, next) => {
+    try {
+        const { mode } = req.body; // "test_only" or "all"
+        
+        if (mode === 'all') {
+            // 全消去
+            await GuestSlot.destroy({ where: {}, truncate: true, cascade: true });
+            await Student.destroy({ where: {}, truncate: true, cascade: true });
+            await Reservation.destroy({ where: {}, truncate: true, cascade: true });
+            await InviteCode.destroy({ where: {}, truncate: true, cascade: true });
+            res.json({ message: 'データベースの全データを消去し、リセットしました。' });
+        } else {
+            // テストデータのみ削除
+            const testStudents = await Student.findAll({ where: { name: { [Op.like]: 'テスト生徒%' } } });
+            const testEmails = testStudents.map(s => s.email);
+            
+            await GuestSlot.destroy({ where: { student_email: { [Op.in]: testEmails } } });
+            await Student.destroy({ where: { email: { [Op.in]: testEmails } } });
+            
+            res.json({ message: 'テストデータを消去しました。' });
+        }
+    } catch (error) { next(error); }
+});
+
+// 固定OTPモードの切り替え
+app.post('/api/admin/test/toggle-otp', authenticateToken, authorizeRole(['admin']), async (req, res, next) => {
+    try {
+        const { enabled } = req.body;
+        isFixedOtpMode = !!enabled;
+        res.json({ 
+            enabled: isFixedOtpMode, 
+            message: isFixedOtpMode ? "テストモードを有効にしました。全生徒が「123456」でログイン可能です。" : "テストモードを無効にしました（通常運用）。"
+        });
+    } catch (error) { next(error); }
+});
+
+// モード状態の取得
+app.get('/api/admin/test/status', authenticateToken, authorizeRole(['admin']), async (req, res, next) => {
+    res.json({ isFixedOtpMode });
+});
+
 // ゲスト用 予約ステータス確認エンドポイント (認証不要・読み取り専用)
 app.get('/api/reservation-status/:id', async (req, res, next) => {
     try {
@@ -1162,26 +796,35 @@ app.post('/api/student/login-otp', otpLimiter, [
 
         await Student.upsertOtp(normalizedEmail, student.name, otp, otpExpiresAt);
 
-        const mailOptions = {
-            to: normalizedEmail,
-            subject: '梨花祭2025 ログイン認証コード',
-            html: `
-                <p>${escapeHtml(student.name)} さん</p>
-                <p>以下の認証コードを入力してください。</p>
-                <p style="font-size: 2rem; font-weight: bold; letter-spacing: 0.3em;">${otp}</p>
-                <p>このコードは<strong>10分間</strong>有効です。</p>
-                <p>このメールに心当たりがない場合は無視してください。</p>
-            `
-        };
+        const isTestAccount = normalizedEmail.startsWith('test_student_');
+        const skipEmail = isFixedOtpMode || isTestAccount;
 
-        try {
-            await sendEmailWithFailover(mailOptions);
-        } catch (emailError) {
-            console.error('ログインOTPメール送信エラー:', emailError.message);
-            return res.status(500).json({ message: 'メールの送信に失敗しました。しばらくしてから再度お試しください。' });
+        if (skipEmail) {
+            console.log(`[TEST MODE] Skip sending login OTP email to: ${normalizedEmail}. Use code: ${otp}`);
+        } else {
+            const mailOptions = {
+                to: normalizedEmail,
+                subject: '梨花祭2025 ログイン認証コード',
+                html: `
+                    <p>${escapeHtml(student.name)} さん</p>
+                    <p>以下の認証コードを入力してください。</p>
+                    <p style="font-size: 2rem; font-weight: bold; letter-spacing: 0.3em;">${otp}</p>
+                    <p>このコードは<strong>10分間</strong>有効です。</p>
+                    <p>このメールに心当たりがない場合は無視してください。</p>
+                `
+            };
+            try {
+                await sendEmailWithFailover(mailOptions);
+            } catch (emailError) {
+                console.error('ログインOTPメール送信エラー:', emailError.message);
+                return res.status(500).json({ message: 'メールの送信に失敗しました。しばらくしてから再度お試しください。' });
+            }
         }
 
-        res.json({ message: 'OTPを送信しました。メールをご確認ください。', name: student.name });
+        const successMsg = skipEmail 
+            ? '【テストモード】認証コード 123456 でログインしてください。' 
+            : 'OTPを送信しました。メールをご確認ください。';
+        res.json({ message: successMsg, name: student.name });
     } catch (error) {
         next(error);
     }
@@ -1213,27 +856,37 @@ app.post('/api/student/request-otp', otpLimiter, [
 
         await Student.upsertOtp(normalizedEmail, escapeHtml(name.trim()), otp, otpExpiresAt, escapeHtml(grade_class.trim()));
 
-        // メール送信
-        const mailOptions = {
-            to: normalizedEmail,
-            subject: '梨花祭2025 生徒認証コード',
-            html: `
-                <p>${escapeHtml(name.trim())} さん</p>
-                <p>以下の認証コードを入力してください。</p>
-                <p style="font-size: 2rem; font-weight: bold; letter-spacing: 0.3em;">${otp}</p>
-                <p>このコードは<strong>10分間</strong>有効です。</p>
-                <p>このメールに心当たりがない場合は無視してください。</p>
-            `
-        };
+        const isTestAccount = normalizedEmail.startsWith('test_student_');
+        const skipEmail = isFixedOtpMode || isTestAccount;
 
-        try {
-            await sendEmailWithFailover(mailOptions);
-        } catch (emailError) {
-            console.error('OTPメール送信エラー:', emailError.message);
-            return res.status(500).json({ message: 'メールの送信に失敗しました。しばらくしてから再度お試しください。' });
+        if (skipEmail) {
+            console.log(`[TEST MODE] Skip sending Student Registration OTP email to: ${normalizedEmail}. Use code: ${otp}`);
+        } else {
+            // メール送信
+            const mailOptions = {
+                to: normalizedEmail,
+                subject: '梨花祭2025 生徒認証コード',
+                html: `
+                    <p>${escapeHtml(name.trim())} さん</p>
+                    <p>以下の認証コードを入力してください。</p>
+                    <p style="font-size: 2rem; font-weight: bold; letter-spacing: 0.3em;">${otp}</p>
+                    <p>このコードは<strong>10分間</strong>有効です。</p>
+                    <p>このメールに心当たりがない場合は無視してください。</p>
+                `
+            };
+
+            try {
+                await sendEmailWithFailover(mailOptions);
+            } catch (emailError) {
+                console.error('OTPメール送信エラー:', emailError.message);
+                return res.status(500).json({ message: 'メールの送信に失敗しました。しばらくしてから再度お試しください。' });
+            }
         }
 
-        res.json({ message: 'OTPを送信しました。メールをご確認ください。' });
+        const successMsg = skipEmail 
+            ? '【テストモード】認証コード 123456 で認証してください。' 
+            : 'OTPを送信しました。メールをご確認ください。';
+        res.json({ message: successMsg });
     } catch (error) {
         next(error);
     }
@@ -1253,21 +906,31 @@ app.post('/api/student/verify-otp', loginLimiter, [
         const { email, otp } = req.body;
         const normalizedEmail = email.trim().toLowerCase();
 
+        // テストモード（全体）またはテスト用アカウントの判定
+        const isTestAccount = normalizedEmail.startsWith('test_student_');
+        const effectiveOtp = (isFixedOtpMode || isTestAccount) ? TEST_FIXED_OTP : null;
+
         const student = await Student.findOne({ where: { email: normalizedEmail } });
 
-        if (!student || student.otp !== otp.trim()) {
+        // OTP検証 (テストモード中は固定値、それ以外はDBの値)
+        const isValid = effectiveOtp ? (otp.trim() === effectiveOtp) : (student && student.otp === otp.trim());
+
+        if (!student || !isValid) {
             return res.status(401).json({ message: '認証コードが正しくありません。' });
         }
 
-        if (new Date() > new Date(student.otp_expires_at)) {
+        // 期限チェック (テストモード・テストアカウントは期限無視)
+        if (!effectiveOtp && new Date() > new Date(student.otp_expires_at)) {
             return res.status(401).json({ message: '認証コードが期限切れです。再度送信してください。' });
         }
 
-        // OTPを無効化
-        await Student.update(
-            { otp: null, otp_expires_at: null },
-            { where: { email: normalizedEmail } }
-        );
+        // OTPを無効化 (テストモード・テストアカウント以外)
+        if (!effectiveOtp) {
+            await Student.update(
+                { otp: null, otp_expires_at: null },
+                { where: { email: normalizedEmail } }
+            );
+        }
 
         const token = jwt.sign(
             { id: student.id, email: student.email, name: student.name, grade_class: student.grade_class || null, role: 'student' },
@@ -1458,6 +1121,163 @@ app.get('/api/guest-entry/:token', async (req, res, next) => {
             qr_code: qrCodeDataURL,
             qr_payload: qrPayload
         });
+    } catch (error) {
+        next(error);
+    }
+});
+
+// ===== 実験・テスト支援機能 (管理者) =====
+
+// テストステータス取得
+app.get('/api/admin/test/status', authenticateToken, authorizeRole(['admin']), async (req, res) => {
+    res.json({ isFixedOtpMode });
+});
+
+// 全体テストモード（固定OTP）の切り替え
+app.post('/api/admin/test/toggle-otp', authenticateToken, authorizeRole(['admin']), async (req, res) => {
+    const { enabled } = req.body;
+    isFixedOtpMode = !!enabled;
+    res.json({ 
+        success: true, 
+        enabled: isFixedOtpMode, 
+        message: isFixedOtpMode ? 'テストモード（固定OTP: 123456）を有効にしました。' : 'テストモードを無効にしました。' 
+    });
+});
+
+// テストデータ生成 (クラス指定対応)
+app.post('/api/admin/test/generate', authenticateToken, authorizeRole(['admin']), async (req, res, next) => {
+    try {
+        const { count, classes } = req.body; // classes: [{ gradeClass: '1-1', count: 40 }, ...]
+        let generatedTotal = 0;
+        
+        const studentsToInsert = [];
+        const slotsToInsert = [];
+        const fixedOtp = '123456';
+        const farFuture = new Date('2099-12-31').toISOString();
+        
+        if (classes && Array.isArray(classes)) {
+            // クラス指定がある場合
+            for (const item of classes) {
+                for (let i = 1; i <= item.count; i++) {
+                    const studentIndex = generatedTotal + i;
+                    const email = `test_student_${studentIndex}@biblos.ac.jp`;
+                    const name = `テスト生徒 ${studentIndex}`;
+                    const gradeClass = item.gradeClass;
+                    const studentId = require('crypto').randomBytes(8).toString('hex');
+
+                    studentsToInsert.push({
+                        id: studentId,
+                        email,
+                        name,
+                        grade_class: gradeClass,
+                        otp: fixedOtp,
+                        otp_expires_at: farFuture,
+                        max_guest_slots: 3
+                    });
+
+                    const slotId = require('crypto').randomBytes(8).toString('hex');
+                    const token = require('crypto').randomBytes(16).toString('hex');
+                    slotsToInsert.push({
+                        id: slotId,
+                        token,
+                        student_email: email,
+                        student_name: name,
+                        guest_name: `${name} (本人テスト用)`,
+                        used: false
+                    });
+                }
+                generatedTotal += item.count;
+            }
+        } else {
+            // 単純な人数指定の場合
+            const totalToGen = parseInt(count) || 100;
+            const defaultClasses = ['1-1', '1-2', '1-3', '1-4', '1-5', '2-1', '2-2', '2-3', '2-4', '2-5', '3-1', '3-2', '3-3', '3-4', '3-5'];
+            for (let i = 1; i <= totalToGen; i++) {
+                const email = `test_student_${i}@biblos.ac.jp`;
+                const name = `テスト生徒 ${i}`;
+                const gradeClass = defaultClasses[i % defaultClasses.length];
+                const studentId = require('crypto').randomBytes(8).toString('hex');
+
+                studentsToInsert.push({
+                    id: studentId,
+                    email,
+                    name,
+                    grade_class: gradeClass,
+                    otp: fixedOtp,
+                    otp_expires_at: farFuture,
+                    max_guest_slots: 3
+                });
+
+                const slotId = require('crypto').randomBytes(8).toString('hex');
+                const token = require('crypto').randomBytes(16).toString('hex');
+                slotsToInsert.push({
+                    id: slotId,
+                    token,
+                    student_email: email,
+                    student_name: name,
+                    guest_name: `${name} (本人テスト用)`,
+                    used: false
+                });
+            }
+            generatedTotal = totalToGen;
+        }
+
+        await sequelize.transaction(async (t) => {
+            // Postgresで Upsert を実現するために updateOnDuplicate を使用 (emailがUNIQUEキーである前提)
+            await Student.bulkCreate(studentsToInsert, { 
+                transaction: t, 
+                updateOnDuplicate: ['name', 'grade_class', 'otp', 'otp_expires_at', 'max_guest_slots'] 
+            });
+            await GuestSlot.bulkCreate(slotsToInsert, { 
+                transaction: t, 
+                ignoreDuplicates: true 
+            });
+        });
+
+        res.json({ success: true, message: `${generatedTotal}名のテストデータを生成しました。認証コードは「${fixedOtp}」で固定されています。` });
+    } catch (error) { next(error); }
+});
+
+// テストデータ削除
+app.post('/api/admin/test/clear', authenticateToken, authorizeRole(['admin']), async (req, res, next) => {
+    try {
+        const { mode } = req.body;
+        if (mode === 'all') {
+            // 全削除 (管理者以外)
+            await GuestSlot.destroy({ where: {} });
+            await Student.destroy({ where: {} });
+            return res.json({ message: '管理アカウント以外の全データを削除しました。' });
+        } else {
+            // テスト生徒のみ削除
+            const testStudents = await Student.findAll({ where: { email: { [Op.like]: 'test_student_%' } } });
+            const emails = testStudents.map(s => s.email);
+            await GuestSlot.destroy({ where: { student_email: emails } });
+            await Student.destroy({ where: { email: emails } });
+            return res.json({ message: 'テストデータに関連する生徒とスロットを削除しました。' });
+        }
+    } catch (error) {
+        next(error);
+    }
+});
+
+// 配布用名簿データ取得
+app.get('/api/admin/student-distribution-data', authenticateToken, authorizeRole(['admin']), async (req, res, next) => {
+    try {
+        const students = await Student.findAll({ order: [['grade_class', 'ASC'], ['name', 'ASC']] });
+        
+        // クラスごとにグループ化
+        const grouped = {};
+        students.forEach(s => {
+            const gc = s.grade_class || '未設定';
+            if (!grouped[gc]) grouped[gc] = [];
+            grouped[gc].push({
+                name: s.name,
+                email: s.email,
+                otp: '123456' // テスト用固定
+            });
+        });
+
+        res.json({ groups: grouped, baseUrl: process.env.FRONTEND_URL || `http://localhost:${port}` });
     } catch (error) {
         next(error);
     }

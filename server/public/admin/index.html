@@ -120,6 +120,9 @@
                     <li class="tab-item" data-target="tab-manual">
                         <a class="tab-link">📚 マニュアル</a>
                     </li>
+                    <li class="tab-item" data-target="tab-test" style="border-left: 1px solid var(--color-border); margin-left: auto;">
+                        <a class="tab-link" style="color: var(--color-danger);">🧪 実験・テスト</a>
+                    </li>
                 </ul>
             </div>
 
@@ -585,6 +588,77 @@
                     </div>
                 </div>
 
+                <!-- 実験・テストタブ -->
+                <div id="tab-test" class="tab-content is-hidden">
+                    <div class="glass-card" style="border: 2px solid var(--color-danger-sub);">
+                        <h2 class="section-title" style="color: var(--color-danger);">🧪 実験・負荷テスト支援機能</h2>
+                        <div class="notification is-warning">
+                            <p><strong>注意:</strong> この機能は本番稼働前のテスト専用です。データの生成や削除は慎重に行ってください。</p>
+                        </div>
+
+                        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 1.5rem; margin-top: 1.5rem;">
+                            <!-- データ生成 -->
+                            <div class="glass-card" style="background: rgba(255,255,255,0.05);">
+                                <h3 class="section-title" style="font-size: 1.1rem; border: none;">👥 テスト生徒の生成</h3>
+                                <p style="font-size: 0.85rem; color: var(--color-text-sub); margin-bottom: 1rem;">
+                                    クラスごとに人数を指定して生成できます。<br>
+                                    例: 1-1:40, 1-2:38, 2-A:35
+                                </p>
+                                <div class="form-group">
+                                    <label class="form-label">クラス配布設定 (クラス名:人数)</label>
+                                    <textarea id="test-gen-config" class="form-input" style="height: 80px;" placeholder="1-1:40, 1-2:40, 1-3:40"></textarea>
+                                </div>
+                                <div style="display: flex; gap: 0.5rem; flex-direction: column;">
+                                    <button class="btn btn-primary" onclick="generateTestDataFromUI()" style="width: 100%;">テストデータを生成する</button>
+                                    <button class="btn btn-outline" onclick="printDistributionList()" style="width: 100%; border-color: var(--color-primary); color: var(--color-primary);">🖨️ 配布用名簿を印刷する</button>
+                                </div>
+                            </div>
+
+                            <!-- データ削除 -->
+                            <div class="glass-card" style="background: rgba(255,255,255,0.05);">
+                                <h3 class="section-title" style="font-size: 1.1rem; border: none;">配分・ログイン情報</h3>
+                                <p style="font-size: 0.85rem; color: var(--color-text-sub);">
+                                    生徒役の人は以下の情報でログインしてください：
+                                </p>
+                                <ul style="font-size: 0.85rem; line-height: 1.6; margin-top: 0.5rem;">
+                                    <li><strong>URL:</strong> <code>/student/</code></li>
+                                    <li><strong>メール:</strong> <code>test_student_1@biblos.ac.jp</code> (1〜N)</li>
+                                    <li><strong>コード:</strong> <code>123456</code></li>
+                                </ul>
+                            </div>
+
+                            <!-- 全体テストモード設定 -->
+                            <div class="glass-card" style="background: rgba(255,255,255,0.05); border: 1px solid var(--color-warning);">
+                                <h3 class="section-title" style="font-size: 1.1rem; border: none; color: var(--color-warning);">⚙️ 全体テストモード</h3>
+                                <p style="font-size: 0.85rem; color: var(--color-text-sub); margin-bottom: 1rem;">
+                                    有効にすると、既存の生徒（本物のメールアドレス）も <strong>「123456」</strong> でログイン可能になります。<br>
+                                    校内での一斉テスト時に便利です。
+                                </p>
+                                <div id="test-mode-status" style="margin-bottom: 1rem; font-weight: bold; font-size: 0.9rem;">
+                                    現在の状態: 取得中...
+                                </div>
+                                <button id="btn-toggle-test-mode" class="btn btn-warning" onclick="toggleTestMode()" style="width: 100%;">
+                                    テストモードを切り替える
+                                </button>
+                            </div>
+                        </div>
+
+                        <div style="margin-top: 2rem; padding-top: 1.5rem; border-top: 1px solid var(--color-border);">
+                            <h3 class="section-title" style="font-size: 1.1rem; color: var(--color-danger); border: none;">🧹 データの清掃・リセット</h3>
+                            <div style="display: flex; gap: 1rem; flex-wrap: wrap;">
+                                <button class="btn btn-outline" onclick="clearTestDataFromUI('test_only')" style="flex: 1; min-width: 200px;">
+                                    テストデータのみ削除
+                                </button>
+                                <button class="btn btn-danger" onclick="clearTestDataFromUI('all')" style="flex: 1; min-width: 200px;">
+                                    全データを削除（DBリセット）
+                                </button>
+                            </div>
+                            <p style="font-size: 0.75rem; color: var(--color-text-sub); margin-top: 0.5rem;">
+                                ※「全データ削除」は招待コード、予約、生徒、ゲストスロットの全てを消去します（管理者アカウントは維持されます）。
+                            </p>
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
@@ -776,6 +850,7 @@
                     showTab(targetTabItem.dataset.target);
                     if (targetTabItem.dataset.target === 'tab-settings') loadSettings();
                     if (targetTabItem.dataset.target === 'tab-students') loadStudentList();
+                    if (targetTabItem.dataset.target === 'tab-test') loadTestStatus();
                 }
             });
 
@@ -867,34 +942,73 @@
         }
 
         // === 通知システム ===
+        // notification-containerを右上固定に初期化
+        dom.notificationContainer.style.cssText = [
+            'position:fixed',
+            'top:1.5rem',
+            'right:1.5rem',
+            'z-index:2000',
+            'display:flex',
+            'flex-direction:column',
+            'align-items:flex-end',
+            'gap:0',
+            'width:90%',
+            'max-width:400px',
+            'pointer-events:none',
+        ].join(';');
+
         function showNotification(message, type = "info") {
+            // 既存を全て除去
+            if (dom.notificationContainer) {
+                const existing = dom.notificationContainer.querySelectorAll('.notification');
+                existing.forEach(el => el.remove());
+            }
+
+            const duration = NOTIFICATION_DISPLAY_TIME_MS; // ms
+
             const notificationDiv = document.createElement("div");
             notificationDiv.className = `notification is-${type}`;
+            notificationDiv.style.setProperty('--notif-duration', `${duration / 1000}s`);
+            notificationDiv.style.pointerEvents = 'auto';
             notificationDiv.textContent = message;
             dom.notificationContainer.appendChild(notificationDiv);
 
-            setTimeout(() => {
-                notificationDiv.classList.add("is-visible");
-            }, 10);
+            // フェードイン
+            requestAnimationFrame(() => {
+                requestAnimationFrame(() => {
+                    notificationDiv.classList.add("is-visible");
+                });
+            });
 
+            // フェードアウト開始
             setTimeout(() => {
                 notificationDiv.classList.remove("is-visible");
+                notificationDiv.classList.add("is-hiding");
                 notificationDiv.addEventListener("transitionend", () => {
                     notificationDiv.remove();
-                });
-            }, NOTIFICATION_DISPLAY_TIME_MS);
+                }, { once: true });
+            }, duration);
         }
 
         function showCheckinNotification(message, isError = false) {
+            // 色を切り替え
+            dom.checkinNotification.style.backgroundColor =
+                isError ? 'var(--color-error)' : 'var(--color-success)';
             dom.checkinNotification.textContent = message;
-            if (isError) {
-                dom.checkinNotification.style.backgroundColor = 'var(--color-error)';
-            } else {
-                dom.checkinNotification.style.backgroundColor = 'var(--color-success)';
+
+            // 前のタイマーをキャンセル
+            if (dom.checkinNotification._hideTimer) {
+                clearTimeout(dom.checkinNotification._hideTimer);
             }
-            dom.checkinNotification.style.display = "block";
-            setTimeout(() => {
-                dom.checkinNotification.style.display = "none";
+
+            // is-hiding を外してフェードイン
+            dom.checkinNotification.classList.remove('is-hiding');
+            dom.checkinNotification.classList.add('is-visible');
+
+            // 一定時間後にフェードアウト
+            dom.checkinNotification._hideTimer = setTimeout(() => {
+                dom.checkinNotification.classList.remove('is-visible');
+                dom.checkinNotification.classList.add('is-hiding');
             }, NOTIFICATION_DISPLAY_TIME_MS);
         }
 
@@ -925,6 +1039,12 @@
             }
         }
 
+        // QRスキャンのクールダウン管理
+        let _lastScannedText = null;
+        let _lastScannedAt = 0;
+        const QR_COOLDOWN_SAME_MS = 3000;   // 同じQRコード: 3秒間は無視
+        const QR_COOLDOWN_ANY_MS = 1500;    // 別のQRコードでも: 1.5秒間は無視
+
         function startQrScanner() {
             // iOS等での音声再生制限解除（ユーザーアクション起点で一度再生する）
             dom.successSound.play().catch(()=>{});
@@ -944,14 +1064,29 @@
                 html5QrCodeScanner.stop().catch(err => console.warn("既存のQRスキャナー停止エラー:", err));
             }
 
+            // クールダウンをリセット
+            _lastScannedText = null;
+            _lastScannedAt = 0;
+
             html5QrCodeScanner = new Html5Qrcode("qr-reader");
 
             html5QrCodeScanner.start(
                 { deviceId: { exact: cameraId } },
                 { fps: 10, qrbox: { width: 250, height: 250 } },
                 (decodedText, decodedResult) => {
+                    const now = Date.now();
+                    const isSame = decodedText === _lastScannedText;
+                    const cooldown = isSame ? QR_COOLDOWN_SAME_MS : QR_COOLDOWN_ANY_MS;
+
+                    // クールダウン中は無視
+                    if (now - _lastScannedAt < cooldown) {
+                        return;
+                    }
+
+                    _lastScannedText = decodedText;
+                    _lastScannedAt = now;
+
                     console.log("QRコードスキャン成功:", decodedText);
-                    // 連続スキャンを可能にするため、スキャナーは停止しない
                     verifyReservation(decodedText);
                 },
                 (errorMessage) => {
@@ -2036,6 +2171,132 @@
                     }
                 }
             });
+        }
+
+        // --- テスト支援機能用 JavaScript ---
+
+        async function generateTestDataFromUI() {
+            const configText = document.getElementById('test-gen-config').value.trim();
+            let payload = {};
+
+            if (configText) {
+                // クラス指定パース: 1-1:40, 1-2:38
+                const classes = configText.split(',').map(item => {
+                    const [gradeClass, countStr] = item.split(':');
+                    if (!gradeClass || !countStr) return null;
+                    return { gradeClass: gradeClass.trim(), count: parseInt(countStr.trim()) };
+                }).filter(i => i !== null);
+
+                if (classes.length === 0) {
+                    return showNotification("形式が正しくありません。(例: 1-1:40, 1-2:40)", "warning");
+                }
+                payload = { classes };
+            } else {
+                const count = prompt("トータルの生成人数を入力してください:", "100");
+                if (count === null) return;
+                payload = { count: parseInt(count) };
+            }
+
+            if (!confirm(`テストデータを生成しますか？\n（少し時間がかかる場合があります）`)) return;
+
+            try {
+                showNotification("生成中...", "info");
+                const response = await authFetch("/api/admin/test/generate", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify(payload)
+                });
+                const result = await response.json();
+                showNotification(result.message, "success");
+                loadDashboard(); 
+            } catch (error) {
+                console.error("生成エラー:", error);
+                showNotification("生成に失敗しました: " + error.message, "error");
+            }
+        }
+
+        function printDistributionList() {
+            const token = localStorage.getItem(TOKEN_KEY);
+            if (!token) return showNotification("認証が必要です", "error");
+            window.open(`print-list.html?token=${token}`, '_blank');
+        }
+
+        async function clearTestDataFromUI(mode) {
+            let message = mode === 'all' 
+                ? "【重要】全てのデータ（招待、予約、生徒、スロット）を完全に消去し、リセットしますか？\nこの操作は取り消せません。" 
+                : "テストデータ（名前が「テスト生徒」で始まるデータ）のみを削除しますか？";
+            
+            if (!confirm(message)) return;
+            if (mode === 'all' && !confirm("本当によろしいですか？管理アカウント以外は全て消えます。")) return;
+
+            try {
+                showNotification("削除中...", "info");
+                const response = await authFetch("/api/admin/test/clear", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ mode })
+                });
+                const result = await response.json();
+                showNotification(result.message, "success");
+                loadDashboard(); // ダッシュボードを更新
+            } catch (error) {
+                console.error("削除エラー:", error);
+                showNotification("削除に失敗しました: " + error.message, "error");
+            }
+        }
+
+        let isFixedOtpMode = false;
+
+        async function loadTestStatus() {
+            try {
+                const response = await authFetch("/api/admin/test/status");
+                const data = await response.json();
+                isFixedOtpMode = data.isFixedOtpMode;
+                updateTestModeUI();
+            } catch (error) {
+                console.error("状態取得エラー:", error);
+            }
+        }
+
+        function updateTestModeUI() {
+            const statusEl = document.getElementById('test-mode-status');
+            const btnEl = document.getElementById('btn-toggle-test-mode');
+            if (!statusEl || !btnEl) return;
+
+            if (isFixedOtpMode) {
+                statusEl.innerHTML = '現在の状態: <span style="color:var(--color-success);">✅ 有効 (テスト中)</span>';
+                statusEl.style.color = 'var(--color-success)';
+                btnEl.textContent = 'テストモードを終了する';
+                btnEl.className = 'btn btn-outline';
+            } else {
+                statusEl.innerHTML = '現在の状態: <span style="color:var(--color-text-sub);">❌ 無効 (通常運用)</span>';
+                statusEl.style.color = 'var(--color-text-sub)';
+                btnEl.textContent = 'テストモードを有効化する';
+                btnEl.className = 'btn btn-warning';
+            }
+        }
+
+        async function toggleTestMode() {
+            const newStatus = !isFixedOtpMode;
+            const msg = newStatus 
+                ? "テストモードを有効にします。全生徒が 123456 でログインできるようになります。よろしいですか？"
+                : "テストモードを終了し、通常運用に戻します。よろしいですか？";
+            
+            if (!confirm(msg)) return;
+
+            try {
+                const response = await authFetch("/api/admin/test/toggle-otp", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ enabled: newStatus })
+                });
+                const result = await response.json();
+                isFixedOtpMode = result.enabled;
+                showNotification(result.message, "success");
+                updateTestModeUI();
+            } catch (error) {
+                showNotification("切り替えに失敗しました。", "error");
+            }
         }
 
         async function exportReportData() {

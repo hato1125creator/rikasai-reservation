@@ -38,49 +38,6 @@ const User = sequelize.define('User', {
     }
 });
 
-const InviteCode = sequelize.define('InviteCode', {
-    code: {
-        type: DataTypes.STRING,
-        allowNull: false,
-        unique: true
-    },
-    used: {
-        type: DataTypes.BOOLEAN,
-        defaultValue: false
-    },
-    name: {
-        type: DataTypes.STRING,
-        allowNull: true // 生成時に名前がない場合もあるため
-    }
-});
-
-const Reservation = sequelize.define('Reservation', {
-    id: {
-        type: DataTypes.INTEGER,
-        primaryKey: true, // app.js 側で乱数を指定しているため autoIncrement は不要
-    },
-    name: {
-        type: DataTypes.STRING,
-        allowNull: false
-    },
-    contact: {
-        type: DataTypes.STRING,
-        allowNull: false
-    },
-    relationship: {
-        type: DataTypes.STRING,
-        allowNull: false
-    },
-    invite_code: {
-        type: DataTypes.STRING,
-        allowNull: false
-    },
-    status: {
-        type: DataTypes.STRING,
-        defaultValue: 'pending' // pending, checked-in, cancelled
-    }
-});
-
 const Student = sequelize.define('Student', {
     id: {
         type: DataTypes.STRING,
@@ -172,8 +129,6 @@ Student.upsertOtp = async function(email, name, otp, otp_expires_at, grade_class
 module.exports = {
     sequelize,
     User,
-    InviteCode,
-    Reservation,
     Student,
     GuestSlot,
     Op

@@ -19,6 +19,7 @@
     --color-success-bg: #E8F5E9;
     --color-warning: #ED6C02;
     --color-warning-bg: #FFF3E0;
+    --color-danger-sub: rgba(211, 47, 47, 0.2);
 
     /* Spacing */
     --spacing-xs: 4px;
@@ -222,6 +223,15 @@ body.landing-page {
     color: #FFFFFF;
 }
 
+.btn-line {
+    background-color: #06C755;
+    color: #FFFFFF;
+}
+
+.btn-line:hover {
+    background-color: #05ae4a;
+}
+
 /* Admin specific buttons */
 .action-buttons {
     display: flex;
@@ -396,18 +406,52 @@ body.landing-page {
 
 /* === Notifications === */
 .notification {
-    position: fixed;
-    top: 20px;
-    right: 20px;
     width: 90%;
     max-width: 400px;
-    padding: 20px;
+    padding: 16px 20px;
     border-radius: var(--radius-md);
     color: #FFF;
     font-weight: 700;
     z-index: 2000;
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
-    animation: slideInDown 0.3s ease-out;
+    margin-bottom: 8px;
+    /* フェードイン・アウト用トランジション */
+    opacity: 0;
+    transform: translateX(24px);
+    transition: opacity 0.35s ease, transform 0.35s ease;
+    /* プログレスバー用 */
+    overflow: hidden;
+    position: relative;
+}
+
+/* 表示状態 */
+.notification.is-visible {
+    opacity: 1;
+    transform: translateX(0);
+}
+
+/* フェードアウト中 */
+.notification.is-hiding {
+    opacity: 0;
+    transform: translateX(24px);
+}
+
+/* 残り時間プログレスバー */
+.notification::after {
+    content: '';
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    height: 3px;
+    background: rgba(255,255,255,0.5);
+    width: 100%;
+    transform-origin: left;
+    animation: notifProgress var(--notif-duration, 3s) linear forwards;
+}
+
+@keyframes notifProgress {
+    from { transform: scaleX(1); }
+    to   { transform: scaleX(0); }
 }
 
 .notification.is-success {
@@ -422,16 +466,8 @@ body.landing-page {
     background-color: var(--color-warning);
 }
 
-@keyframes slideInDown {
-    from {
-        transform: translateY(-30px);
-        opacity: 0;
-    }
-
-    to {
-        transform: translateY(0);
-        opacity: 1;
-    }
+.notification.is-info {
+    background-color: var(--color-primary);
 }
 
 /* === Inline Notifications (Inside Cards) === */
@@ -641,11 +677,13 @@ body.landing-page {
 
 /* === Check-in Notification === */
 .checkin-notification {
-    display: none;
     position: fixed;
     top: 50%;
     left: 50%;
-    transform: translate(-50%, -50%);
+    /* 非表示状態 */
+    transform: translate(-50%, -50%) scale(0.85);
+    opacity: 0;
+    pointer-events: none;
     background: var(--color-success);
     color: #FFFFFF;
     font-size: 24px;
@@ -658,18 +696,20 @@ body.landing-page {
     width: 90%;
     max-width: 400px;
     box-sizing: border-box;
-    animation: scaleIn 0.3s ease-out;
+    transition: opacity 0.3s ease, transform 0.3s ease;
 }
 
-@keyframes scaleIn {
-    from {
-        transform: translate(-50%, -50%) scale(0.8);
-        opacity: 0;
-    }
-    to {
-        transform: translate(-50%, -50%) scale(1);
-        opacity: 1;
-    }
+/* 表示状態 */
+.checkin-notification.is-visible {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1);
+    pointer-events: auto;
+}
+
+/* フェードアウト中 */
+.checkin-notification.is-hiding {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(0.85);
 }
 
 /* === Chart Container === */

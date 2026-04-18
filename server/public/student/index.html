@@ -7,6 +7,8 @@
     <link rel="stylesheet" href="/css/style.css">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <!-- QRコード生成ライブラリ -->
+    <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.1/build/qrcode.min.js"></script>
     <style>
         .tab-bar {
             display: flex;
@@ -78,6 +80,59 @@
             text-align: left;
         }
         .add-guest-form input { width: 100%; margin-bottom: 0.75rem; }
+
+        /* チケット画像表示用モーダル */
+        .modal-overlay {
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(0, 0, 0, 0.85);
+            display: none;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+            padding: 1rem;
+            backdrop-filter: blur(8px);
+        }
+        .modal-overlay.is-active { display: flex; }
+        .modal-container {
+            max-width: 90%;
+            max-height: 80vh;
+            position: relative;
+            background: #fff;
+            border-radius: var(--radius-md);
+            overflow: hidden;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.5);
+        }
+        .modal-image {
+            display: block;
+            max-width: 100%;
+            height: auto;
+        }
+        .modal-footer {
+            width: 100%;
+            padding: 1rem;
+            background: #fff;
+            display: flex;
+            flex-direction: column;
+            gap: 0.75rem;
+            align-items: center;
+        }
+        .modal-close {
+            position: absolute;
+            top: 10px; right: 10px;
+            width: 32px; height: 32px;
+            background: rgba(0,0,0,0.5);
+            color: #fff;
+            border: none;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            font-size: 1.25rem;
+            z-index: 1001;
+        }
     </style>
 </head>
 <body class="landing-page">
@@ -178,15 +233,20 @@
             <p style="margin-top: 1.5rem; font-size: 0.8rem; color: var(--color-text-sub);">
                 ※ 招待リンクをゲストに送ってください。ゲストはリンクを開くだけで入場QRが表示されます。
             </p>
-
-            <div style="margin-top: 1.5rem; background: var(--color-bg); padding: 1rem; border-radius: 8px;">
-                <h3 style="font-size: 0.95rem; margin-top:0; margin-bottom: 0.5rem; color: var(--color-text);">📝 招待メッセージの設定</h3>
-                <textarea id="input-message-template" class="form-input" rows="3" style="resize: vertical; min-height: 80px;" placeholder="梨花祭にご招待します！以下のURLから入場チケットとなるQRコードを表示できます。&#10;【チケットURL】&#10;{URL}"></textarea>
-                <p style="font-size: 0.75rem; color: var(--color-text-sub); margin-top: 0.25rem;">※ <code>{URL}</code> と <code>{GUEST_NAME}</code> は自動で置き換わります。</p>
-                <button class="btn btn-outline" style="width:100%; margin-top: 0.5rem;" onclick="saveMessageTemplate()">テンプレートを保存</button>
-            </div>
         </div>
 
+    </div>
+
+    <!-- チケット画像モーダル -->
+    <div id="ticket-modal" class="modal-overlay">
+        <div class="modal-container">
+            <button class="modal-close" onclick="closeTicketModal()">&times;</button>
+            <img id="modal-ticket-img" class="modal-image" src="" alt="デジタルチケット">
+            <div class="modal-footer">
+                <p style="color: #333; font-size: 0.85rem; margin: 0;">画像を長押しして保存するか、<br>下のボタンからダウンロードしてください。</p>
+                <a id="modal-download-link" class="btn btn-primary" style="width: 100%; text-decoration: none; text-align: center;" download="">画像をダウンロード</a>
+            </div>
+        </div>
     </div>
 
     <script>
@@ -368,10 +428,6 @@
                 if (res.status === 401 || res.status === 403) { logout(); return; }
                 const data = await res.json();
                 maxSlots = data.maxSlots || 3;
-                currentMessageTemplate = data.message_template || '';
-
-                const defaultTemplate = "梨花祭にご招待します！以下のURLから入場チケットとなるQRコードを表示できます。\n【チケットURL】\n{URL}";
-                document.getElementById('input-message-template').value = currentMessageTemplate || defaultTemplate;
 
                 document.getElementById('page-login').style.display = 'none';
                 document.getElementById('page-dashboard').style.display = 'block';
@@ -401,22 +457,26 @@
                 const url = `${baseUrl}/?token=${slot.token}`;
                 const div = document.createElement('div');
                 div.className = 'slot-card';
+                div.style.flexDirection = 'column';
+                div.style.alignItems = 'stretch';
+                
                 div.innerHTML = `
-                    <div class="slot-info">
-                        <div style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.25rem;">
-                            <div class="slot-name" style="margin-bottom: 0;">${escHtml(slot.guest_name)}</div>
-                            ${!slot.used ? `<button class="btn" style="padding: 0.1rem 0.4rem; font-size: 0.7rem; background: var(--color-primary); color: white;" onclick="editGuestName('${slot.id}', '${escHtml(slot.guest_name)}')">編集</button>` : ''}
+                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.75rem;">
+                        <div class="slot-info">
+                            <div class="slot-name">${escHtml(slot.guest_name)} 様</div>
+                            <div class="slot-status ${slot.used ? 'used' : 'unused'}">
+                                ${slot.used ? '✅ 使用済み' : '⏳ 未使用'}
+                            </div>
                         </div>
-                        <div class="slot-status ${slot.used ? 'used' : 'unused'}">
-                            ${slot.used ? '✅ 使用済み' : '⬜ 未使用'}
-                        </div>
+                        ${!slot.used ? `<button class="btn" style="padding: 0.2rem 0.6rem; font-size: 0.75rem; background: var(--color-bg); color: var(--color-text-sub); width:auto;" onclick="editGuestName('${slot.id}', '${escHtml(slot.guest_name)}')">名前変更</button>` : ''}
                     </div>
                     ${!slot.used
-                        ? `<div style="display:flex; gap:0.5rem; margin-top:0.5rem;">
-                               <button class="btn-copy" style="flex:1;" id="copy-btn-${i}" onclick="copyLink('${escHtml(url)}', ${i}, '${escHtml(slot.guest_name)}')">コピー</button>
-                               <button class="btn-copy" style="flex:1; background:#06C755; color:white; border:none;" onclick="shareLine('${escHtml(url)}', '${escHtml(slot.guest_name)}')">LINE</button>
-                           </div>`
-                        : '<span style="font-size:0.8rem; color: var(--color-text-sub); display:block; margin-top:0.5rem;">入場済み</span>'
+                        ? `<div style="display:grid; grid-template-columns: 1fr 1fr; gap:0.5rem;">
+                               <button class="btn-copy" id="copy-btn-${i}" onclick="copyLink('${escHtml(url)}', ${i}, '${escHtml(slot.guest_name)}')">📋 コピー</button>
+                               <button class="btn-copy btn-line" style="border:none;" onclick="shareLine('${escHtml(url)}', '${escHtml(slot.guest_name)}')">LINE送る</button>
+                           </div>
+                           <button class="btn-copy" style="width:100%; margin-top:0.5rem; background: var(--color-bg); color: var(--color-primary); border: 1px dotted var(--color-primary); font-weight: 500;" onclick="downloadTicketImage('${escHtml(url)}', '${escHtml(slot.guest_name)}')">🎟️ チケット画像を保存</button>`
+                        : '<div style="background:#f3f4f6; color:#9ca3af; text-align:center; padding:0.5rem; border-radius:8px; font-size:0.8rem;">ご入場ありがとうございました</div>'
                     }
                 `;
                 container.appendChild(div);
@@ -490,43 +550,19 @@
                     const data = await res.json();
                     
                     if (res.ok) {
+                        showNotification('名前を変更しました', 'success');
                         await loadDashboard();
                     } else {
-                        alert(data.message || '更新に失敗しました。');
+                        showNotification(data.message || '更新に失敗しました。', 'error');
                     }
                 } catch (e) {
-                    alert('サーバーエラーが発生しました。');
+                    showNotification('サーバーエラーが発生しました。', 'error');
                 }
-            }
-        }
-
-        // ===== メッセージテンプレート =====
-        async function saveMessageTemplate() {
-            const tmpl = document.getElementById('input-message-template').value;
-            try {
-                const res = await fetch('/api/student/message-template', {
-                    method: 'PUT',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'Authorization': `Bearer ${studentToken}`
-                    },
-                    body: JSON.stringify({ message_template: tmpl })
-                });
-                if (res.ok) {
-                    currentMessageTemplate = tmpl;
-                    alert('テンプレートを保存しました。');
-                } else {
-                    const data = await res.json();
-                    alert(data.message || '保存に失敗しました。');
-                }
-            } catch (e) {
-                alert('サーバーエラーが発生しました。');
             }
         }
 
         function createMessage(url, guestName) {
-            const template = currentMessageTemplate || "梨花祭にご招待します！以下のURLから入場チケットとなるQRコードを表示できます。\n【チケットURL】\n{URL}";
-            return template.replace(/\{URL\}/g, url).replace(/\{GUEST_NAME\}/g, guestName);
+            return `梨花祭にご招待します！ ${guestName} 様の入場チケットはこちらです。\n\n【入場用URL】\n${url}`;
         }
 
         // ===== コピー =====
@@ -551,7 +587,155 @@
             window.open(lineUrl, '_blank');
         }
 
+        // ===== デジタルチケット画像生成 (Canvas) =====
+        async function downloadTicketImage(url, guestName) {
+            showNotification('チケット画像を生成中...', 'info');
+            
+            try {
+                // QRコードをデータURLとして生成
+                const qrDataUrl = await QRCode.toDataURL(url, {
+                    width: 300,
+                    margin: 1,
+                    color: { dark: '#111827', light: '#ffffff' }
+                });
+
+                // Canvasの準備 (800x1200 の縦長サイズ)
+                const canvas = document.createElement('canvas');
+                canvas.width = 800;
+                canvas.height = 1200;
+                const ctx = canvas.getContext('2d');
+
+                // 背景グラデーション
+                const gradient = ctx.createLinearGradient(0, 0, 800, 1200);
+                gradient.addColorStop(0, '#4f46e5'); // Indigo
+                gradient.addColorStop(1, '#ec4899'); // Pink
+                ctx.fillStyle = gradient;
+                ctx.fillRect(0, 0, 800, 1200);
+
+                // 背景の装飾 (円形)
+                ctx.fillStyle = 'rgba(255, 255, 255, 0.08)';
+                ctx.beginPath(); ctx.arc(100, 100, 300, 0, Math.PI * 2); ctx.fill();
+                ctx.beginPath(); ctx.arc(700, 1000, 400, 0, Math.PI * 2); ctx.fill();
+                ctx.beginPath(); ctx.arc(800, 300, 200, 0, Math.PI * 2); ctx.fill();
+
+                // 中央の白いチケットエリア
+                const cardWidth = 660;
+                const cardHeight = 940;
+                const cardX = (800 - cardWidth) / 2;
+                const cardY = (1200 - cardHeight) / 2;
+
+                // 影
+                ctx.shadowColor = 'rgba(0, 0, 0, 0.25)';
+                ctx.shadowBlur = 30;
+                ctx.shadowOffsetY = 15;
+                
+                // 白背景 (角丸対応のため自分で描画するか roundRect 使用)
+                ctx.fillStyle = '#ffffff';
+                ctx.beginPath();
+                if (ctx.roundRect) {
+                    ctx.roundRect(cardX, cardY, cardWidth, cardHeight, 30);
+                } else {
+                    ctx.rect(cardX, cardY, cardWidth, cardHeight); // fallback
+                }
+                ctx.fill();
+
+                // 影をリセット
+                ctx.shadowColor = 'transparent';
+
+                // 切り取り線（ミシン目）
+                ctx.strokeStyle = '#e5e7eb';
+                ctx.lineWidth = 4;
+                ctx.setLineDash([15, 10]);
+                ctx.beginPath();
+                ctx.moveTo(cardX, cardY + 680);
+                ctx.lineTo(cardX + cardWidth, cardY + 680);
+                ctx.stroke();
+                ctx.setLineDash([]); // リセット
+
+                // --- テキスト描画 ---
+                ctx.textAlign = 'center';
+                
+                // ヘッダー: 梨花祭 2025
+                ctx.fillStyle = '#1e1b4b';
+                ctx.font = 'bold 54px "Noto Sans JP", sans-serif';
+                ctx.fillText('梨花祭 2025', 400, cardY + 110);
+
+                // サブタイトル
+                ctx.font = 'bold 28px "Inter", sans-serif';
+                ctx.fillStyle = '#6366f1';
+                ctx.fillText('SPECIAL GUEST TICKET', 400, cardY + 165);
+
+                // ゲスト名
+                ctx.fillStyle = '#111827';
+                ctx.font = 'bold 56px "Noto Sans JP", sans-serif';
+                const displayName = guestName.length > 12 ? guestName.substring(0, 12) + '…' : guestName;
+                ctx.fillText(displayName + ' 様', 400, cardY + 300);
+
+                // --- QRコード描画 ---
+                const qrImg = new Image();
+                qrImg.src = qrDataUrl;
+                await new Promise(resolve => qrImg.onload = resolve);
+                
+                const qrSize = 270;
+                const qrX = (800 - qrSize) / 2;
+                const qrY = cardY + 350;
+                
+                // QRコードの下に薄い枠線を敷く
+                ctx.strokeStyle = '#f3f4f6';
+                ctx.lineWidth = 2;
+                ctx.strokeRect(qrX - 10, qrY - 10, qrSize + 20, qrSize + 20);
+                ctx.drawImage(qrImg, qrX, qrY, qrSize, qrSize);
+
+                // --- フッター（インフォメーション） ---
+                ctx.fillStyle = '#4b5563';
+                ctx.font = 'bold 26px "Noto Sans JP", sans-serif';
+                ctx.fillText('当日はこのQRコードをご提示ください', 400, cardY + 740);
+                
+                ctx.font = '24px "Noto Sans JP", sans-serif';
+                ctx.fillText('開催日: 2025年6月◯日（土）9:00〜14:00', 400, cardY + 810);
+                ctx.fillText('場所: 千葉英和高等学校', 400, cardY + 860);
+
+                // 注意書き
+                ctx.fillStyle = '#9ca3af';
+                ctx.font = '18px "Noto Sans JP", sans-serif';
+                ctx.fillText('※このチケットは1回のみ有効です', 400, cardY + 900);
+
+                // Canvasを画像データへ変換してモーダルに表示
+                const dataUrl = canvas.toDataURL('image/png');
+                const modalImg = document.getElementById('modal-ticket-img');
+                const downloadLink = document.getElementById('modal-download-link');
+                const modal = document.getElementById('ticket-modal');
+
+                modalImg.src = dataUrl;
+                downloadLink.href = dataUrl;
+                downloadLink.download = `梨花祭チケット_${guestName}.png`;
+                
+                modal.classList.add('is-active');
+                showNotification('チケット画像を生成しました', 'success');
+            } catch (err) {
+                console.error("画像生成エラー:", err);
+                showNotification('画像の生成に失敗しました', 'error');
+            }
+        }
+
+        function closeTicketModal() {
+            document.getElementById('ticket-modal').classList.remove('is-active');
+        }
+
         // ===== ユーティリティ =====
+        function showNotification(message, type = 'success') {
+            // 表示済みのものを消去（重ならないようにする）
+            document.querySelectorAll('.notification').forEach(el => el.remove());
+            
+            const div = document.createElement('div');
+            div.className = `notification is-${type}`;
+            div.textContent = message;
+            document.body.appendChild(div);
+            setTimeout(() => {
+                if (div.parentNode) div.parentNode.removeChild(div);
+            }, 3000);
+        }
+
         function backToForm() {
             document.getElementById('step-otp').style.display = 'none';
             document.querySelector('.tab-bar').style.display = 'flex';
