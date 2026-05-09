@@ -1,12 +1,25 @@
 <!DOCTYPE html>
 <html lang="ja">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>梨花祭2025 生徒ダッシュボード</title>
+    <title>梨花祭2026 生徒ダッシュボード</title>
     <link rel="stylesheet" href="/css/style.css">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="manifest" href="/manifest.json">
+    <script>
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('/sw.js').then(reg => {
+                    console.log('Service Worker registered!');
+                }).catch(err => {
+                    console.log('Service Worker registration failed:', err);
+                });
+            });
+        }
+    </script>
     <!-- QRコード生成ライブラリ -->
     <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.1/build/qrcode.min.js"></script>
     <style>
@@ -18,6 +31,7 @@
             margin-bottom: 1.5rem;
             gap: 4px;
         }
+
         .tab-btn {
             flex: 1;
             padding: 0.55rem 0;
@@ -30,10 +44,12 @@
             color: var(--color-text-sub);
             transition: background 0.2s, color 0.2s;
         }
+
         .tab-btn.active {
             background: var(--color-primary);
             color: #fff;
         }
+
         .slot-card {
             background: var(--color-bg);
             border-radius: var(--radius-md);
@@ -44,11 +60,30 @@
             justify-content: space-between;
             gap: 0.75rem;
         }
-        .slot-info { flex: 1; text-align: left; }
-        .slot-name { font-weight: 700; font-size: 1rem; margin-bottom: 0.25rem; }
-        .slot-status { font-size: 0.8rem; }
-        .slot-status.used { color: var(--color-error); }
-        .slot-status.unused { color: var(--color-success); }
+
+        .slot-info {
+            flex: 1;
+            text-align: left;
+        }
+
+        .slot-name {
+            font-weight: 700;
+            font-size: 1rem;
+            margin-bottom: 0.25rem;
+        }
+
+        .slot-status {
+            font-size: 0.8rem;
+        }
+
+        .slot-status.used {
+            color: var(--color-error);
+        }
+
+        .slot-status.unused {
+            color: var(--color-success);
+        }
+
         .btn-copy {
             padding: 0.4rem 0.85rem;
             font-size: 0.8rem;
@@ -60,8 +95,18 @@
             white-space: nowrap;
             transition: background 0.2s, color 0.2s;
         }
-        .btn-copy:hover { background: var(--color-primary); color: #fff; }
-        .btn-copy.copied { background: var(--color-success); border-color: var(--color-success); color: #fff; }
+
+        .btn-copy:hover {
+            background: var(--color-primary);
+            color: #fff;
+        }
+
+        .btn-copy.copied {
+            background: var(--color-success);
+            border-color: var(--color-success);
+            color: #fff;
+        }
+
         .count-badge {
             display: inline-block;
             background: var(--color-primary);
@@ -72,6 +117,7 @@
             font-weight: 600;
             margin-bottom: 1.25rem;
         }
+
         .add-guest-form {
             background: var(--color-bg);
             border-radius: var(--radius-md);
@@ -79,12 +125,19 @@
             margin-bottom: 1.25rem;
             text-align: left;
         }
-        .add-guest-form input { width: 100%; margin-bottom: 0.75rem; }
+
+        .add-guest-form input {
+            width: 100%;
+            margin-bottom: 0.75rem;
+        }
 
         /* チケット画像表示用モーダル */
         .modal-overlay {
             position: fixed;
-            top: 0; left: 0; right: 0; bottom: 0;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
             background: rgba(0, 0, 0, 0.85);
             display: none;
             flex-direction: column;
@@ -94,7 +147,11 @@
             padding: 1rem;
             backdrop-filter: blur(8px);
         }
-        .modal-overlay.is-active { display: flex; }
+
+        .modal-overlay.is-active {
+            display: flex;
+        }
+
         .modal-container {
             max-width: 90%;
             max-height: 80vh;
@@ -102,13 +159,15 @@
             background: #fff;
             border-radius: var(--radius-md);
             overflow: hidden;
-            box-shadow: 0 10px 40px rgba(0,0,0,0.5);
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5);
         }
+
         .modal-image {
             display: block;
             max-width: 100%;
             height: auto;
         }
+
         .modal-footer {
             width: 100%;
             padding: 1rem;
@@ -118,11 +177,14 @@
             gap: 0.75rem;
             align-items: center;
         }
+
         .modal-close {
             position: absolute;
-            top: 10px; right: 10px;
-            width: 32px; height: 32px;
-            background: rgba(0,0,0,0.5);
+            top: 10px;
+            right: 10px;
+            width: 32px;
+            height: 32px;
+            background: rgba(0, 0, 0, 0.5);
             color: #fff;
             border: none;
             border-radius: 50%;
@@ -135,12 +197,13 @@
         }
     </style>
 </head>
+
 <body class="landing-page">
     <div class="glass-card slide-up" style="max-width: 500px; margin: 0 auto;">
 
         <!-- ===== ログイン画面 ===== -->
         <div id="page-login">
-            <h1 class="title">梨花祭2025</h1>
+            <h1 class="title">梨花祭2026</h1>
             <p class="subtitle">生徒ダッシュボード</p>
 
             <!-- タブ切り替え -->
@@ -153,7 +216,8 @@
             <div id="form-login" class="fade-in">
                 <div class="form-group">
                     <label class="form-label" for="login-email">学校メールアドレス</label>
-                    <input class="form-input" type="email" id="login-email" placeholder="xxxx@biblos.ac.jp" autocomplete="email">
+                    <input class="form-input" type="email" id="login-email" placeholder="xxxx@biblos.ac.jp"
+                        autocomplete="email">
                 </div>
                 <p id="login-error" class="help is-danger" style="display:none;"></p>
                 <button class="btn btn-primary" style="width:100%;" onclick="sendLoginOtp()">認証コードを送信</button>
@@ -163,7 +227,8 @@
             <div id="form-register" class="fade-in" style="display:none;">
                 <div class="form-group">
                     <label class="form-label" for="reg-email">学校メールアドレス</label>
-                    <input class="form-input" type="email" id="reg-email" placeholder="xxxx@biblos.ac.jp" autocomplete="email">
+                    <input class="form-input" type="email" id="reg-email" placeholder="xxxx@biblos.ac.jp"
+                        autocomplete="email">
                 </div>
                 <div class="form-group">
                     <label class="form-label" for="reg-name">氏名</label>
@@ -174,6 +239,14 @@
                     <select class="form-input" id="reg-grade-class" style="appearance: auto; padding-right: 2rem;">
                         <option value="">選択してください</option>
                     </select>
+                </div>
+                <div class="form-group" style="display: flex; align-items: center; gap: 8px;">
+                    <input type="checkbox" id="reg-privacy-agree" style="width: 18px; height: 18px; cursor: pointer;">
+                    <label for="reg-privacy-agree"
+                        style="font-size: 0.9rem; cursor: pointer; color: var(--color-text-main);">
+                        <a href="/privacy.html" target="_blank"
+                            style="color: var(--color-primary); text-decoration: underline;">プライバシーポリシー</a>に同意する
+                    </label>
                 </div>
                 <p id="register-error" class="help is-danger" style="display:none;"></p>
                 <button class="btn btn-primary" style="width:100%;" onclick="sendRegisterOtp()">認証コードを送信</button>
@@ -186,11 +259,13 @@
                 </p>
                 <div class="form-group">
                     <label class="form-label" for="input-otp">認証コード（6桁）</label>
-                    <input class="form-input" type="text" id="input-otp" placeholder="123456" maxlength="6" inputmode="numeric">
+                    <input class="form-input" type="text" id="input-otp" placeholder="123456" maxlength="6"
+                        inputmode="numeric">
                 </div>
                 <p id="otp-error" class="help is-danger" style="display:none;"></p>
                 <div style="display:flex; gap:0.75rem;">
-                    <button class="btn" style="flex:1; background: var(--color-bg); color: var(--color-text);" onclick="backToForm()">戻る</button>
+                    <button class="btn" style="flex:1; background: var(--color-bg); color: var(--color-text);"
+                        onclick="backToForm()">戻る</button>
                     <button class="btn btn-primary" style="flex:2;" onclick="verifyOtp()">ログイン</button>
                 </div>
             </div>
@@ -204,12 +279,21 @@
 
         <!-- ===== ダッシュボード ===== -->
         <div id="page-dashboard" style="display:none;">
-            <div style="display:flex; align-items:flex-start; justify-content:space-between; margin-bottom:1.25rem; gap: 1rem;">
+            <div
+                style="display:flex; align-items:flex-start; justify-content:space-between; margin-bottom:1.25rem; gap: 1rem;">
                 <div style="flex: 1; word-wrap: break-word;">
-                    <h1 class="title" style="font-size: 1.4rem; margin:0; text-align: left;">梨花祭2025</h1>
-                    <p id="dash-name" style="color: var(--color-text-sub); margin:0; font-size:0.9rem; line-height: 1.4;"></p>
+                    <h1 class="title" style="font-size: 1.4rem; margin:0; text-align: left;">梨花祭2026</h1>
+                    <p id="dash-name"
+                        style="color: var(--color-text-sub); margin:0; font-size:0.9rem; line-height: 1.4;"></p>
                 </div>
-                <button class="btn" style="padding: 0.4rem 0.85rem; font-size:0.8rem; background: var(--color-bg); color: var(--color-text-sub); flex-shrink: 0; width: auto;" onclick="logout()">ログアウト</button>
+                <button class="btn"
+                    style="padding: 0.4rem 0.85rem; font-size:0.8rem; background: var(--color-bg); color: var(--color-text-sub); flex-shrink: 0; width: auto;"
+                    onclick="logout()">ログアウト</button>
+            </div>
+
+            <div style="background: rgba(255, 193, 7, 0.1); border: 1px solid rgba(255, 193, 7, 0.5); padding: 12px; border-radius: var(--radius-md); margin-bottom: 1.5rem; text-align: left;">
+                <p style="font-size: 0.85rem; color: #b45309; margin: 0; font-weight: 600;">💡 最も確実な招待方法</p>
+                <p style="font-size: 0.8rem; color: #b45309; margin: 5px 0 0 0;">当日は電波が混み合い、ゲストがリンクを開けない事故が多発します。<br>「チケット画像を保存」から画像をダウンロードし、<strong style="text-decoration: underline;">LINEの写真として直接ゲストに送る</strong>のが一番確実です。</p>
             </div>
 
             <p class="subtitle" style="text-align:left; margin-bottom: 0.5rem;">招待リンク管理</p>
@@ -222,11 +306,13 @@
                     <label class="form-label" for="input-guest-name">ゲストの名前を入力して招待リンクを作成</label>
                     <input class="form-input" type="text" id="input-guest-name" placeholder="例: 鈴木 花子">
                     <p id="add-error" class="help is-danger" style="display:none;"></p>
-                    <button class="btn btn-primary" style="width:100%;" id="btn-add-guest" onclick="addGuest()">招待リンクを生成</button>
+                    <button class="btn btn-primary" style="width:100%;" id="btn-add-guest"
+                        onclick="addGuest()">招待リンクを生成</button>
                 </div>
             </div>
 
-            <p id="limit-notice" style="display:none; color: var(--color-text-sub); font-size:0.85rem; margin-top:0.5rem;">
+            <p id="limit-notice"
+                style="display:none; color: var(--color-text-sub); font-size:0.85rem; margin-top:0.5rem;">
                 招待枠をすべて使用しました。
             </p>
 
@@ -244,7 +330,8 @@
             <img id="modal-ticket-img" class="modal-image" src="" alt="デジタルチケット">
             <div class="modal-footer">
                 <p style="color: #333; font-size: 0.85rem; margin: 0;">画像を長押しして保存するか、<br>下のボタンからダウンロードしてください。</p>
-                <a id="modal-download-link" class="btn btn-primary" style="width: 100%; text-decoration: none; text-align: center;" download="">画像をダウンロード</a>
+                <a id="modal-download-link" class="btn btn-primary"
+                    style="width: 100%; text-decoration: none; text-align: center;" download="">画像をダウンロード</a>
             </div>
         </div>
     </div>
@@ -340,11 +427,18 @@
             const email = document.getElementById('reg-email').value.trim();
             const name = document.getElementById('reg-name').value.trim();
             const grade_class = document.getElementById('reg-grade-class').value;
+            const privacyAgree = document.getElementById('reg-privacy-agree').checked;
             const errEl = document.getElementById('register-error');
             errEl.style.display = 'none';
 
             if (!email || !name || !grade_class) {
                 errEl.textContent = 'メールアドレス、氏名、学年クラスを入力してください。';
+                errEl.style.display = 'block';
+                return;
+            }
+
+            if (!privacyAgree) {
+                errEl.textContent = 'プライバシーポリシーへの同意が必要です。';
                 errEl.style.display = 'block';
                 return;
             }
@@ -459,7 +553,7 @@
                 div.className = 'slot-card';
                 div.style.flexDirection = 'column';
                 div.style.alignItems = 'stretch';
-                
+
                 div.innerHTML = `
                     <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.75rem;">
                         <div class="slot-info">
@@ -548,7 +642,7 @@
                         body: JSON.stringify({ guest_name: newName.trim() })
                     });
                     const data = await res.json();
-                    
+
                     if (res.ok) {
                         showNotification('名前を変更しました', 'success');
                         await loadDashboard();
@@ -562,7 +656,7 @@
         }
 
         function createMessage(url, guestName) {
-            return `梨花祭にご招待します！ ${guestName} 様の入場チケットはこちらです。\n\n【入場用URL】\n${url}`;
+            return `梨花祭にご招待します！ ${guestName} 様の入場チケットはこちらです。\n\n【入場用URL】\n${url}\n\n⚠️重要⚠️\n当日は会場の電波が大変混み合います。スムーズに入場するため、必ず【事前に（ご自宅などで）】上記リンクを開き、チケット画像をスマートフォンに保存しておいてください。`;
         }
 
         // ===== コピー =====
@@ -590,7 +684,7 @@
         // ===== デジタルチケット画像生成 (Canvas) =====
         async function downloadTicketImage(url, guestName) {
             showNotification('チケット画像を生成中...', 'info');
-            
+
             try {
                 // QRコードをデータURLとして生成
                 const qrDataUrl = await QRCode.toDataURL(url, {
@@ -628,7 +722,7 @@
                 ctx.shadowColor = 'rgba(0, 0, 0, 0.25)';
                 ctx.shadowBlur = 30;
                 ctx.shadowOffsetY = 15;
-                
+
                 // 白背景 (角丸対応のため自分で描画するか roundRect 使用)
                 ctx.fillStyle = '#ffffff';
                 ctx.beginPath();
@@ -654,7 +748,7 @@
 
                 // --- テキスト描画 ---
                 ctx.textAlign = 'center';
-                
+
                 // ヘッダー: 梨花祭 2025
                 ctx.fillStyle = '#1e1b4b';
                 ctx.font = 'bold 54px "Noto Sans JP", sans-serif';
@@ -675,11 +769,11 @@
                 const qrImg = new Image();
                 qrImg.src = qrDataUrl;
                 await new Promise(resolve => qrImg.onload = resolve);
-                
+
                 const qrSize = 270;
                 const qrX = (800 - qrSize) / 2;
                 const qrY = cardY + 350;
-                
+
                 // QRコードの下に薄い枠線を敷く
                 ctx.strokeStyle = '#f3f4f6';
                 ctx.lineWidth = 2;
@@ -690,7 +784,7 @@
                 ctx.fillStyle = '#4b5563';
                 ctx.font = 'bold 26px "Noto Sans JP", sans-serif';
                 ctx.fillText('当日はこのQRコードをご提示ください', 400, cardY + 740);
-                
+
                 ctx.font = '24px "Noto Sans JP", sans-serif';
                 ctx.fillText('開催日: 2025年6月◯日（土）9:00〜14:00', 400, cardY + 810);
                 ctx.fillText('場所: 千葉英和高等学校', 400, cardY + 860);
@@ -709,7 +803,7 @@
                 modalImg.src = dataUrl;
                 downloadLink.href = dataUrl;
                 downloadLink.download = `梨花祭チケット_${guestName}.png`;
-                
+
                 modal.classList.add('is-active');
                 showNotification('チケット画像を生成しました', 'success');
             } catch (err) {
@@ -726,7 +820,7 @@
         function showNotification(message, type = 'success') {
             // 表示済みのものを消去（重ならないようにする）
             document.querySelectorAll('.notification').forEach(el => el.remove());
-            
+
             const div = document.createElement('div');
             div.className = `notification is-${type}`;
             div.textContent = message;
@@ -776,7 +870,8 @@
     </script>
 
     <footer style="text-align: center; margin-top: 2rem; padding: 1rem;">
-        <p style="color: var(--color-text-sub); font-size: 12px;">&copy; 2025 千葉英和高校梨花祭運営委員</p>
+        <p style="color: var(--color-text-sub); font-size: 12px;">&copy; 2026 千葉英和高校梨花祭運営委員</p>
     </footer>
 </body>
+
 </html>

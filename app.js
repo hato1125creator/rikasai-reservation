@@ -92,7 +92,7 @@ app.use('/student', express.static(path.join(__dirname, 'server/public/student')
 app.use(express.static(path.join(__dirname, 'server/public')));
 
 // DB initialization (PostgreSQL)
-const { sequelize, User, Student, GuestSlot, Op } = require('./server/db-postgres');
+const { sequelize, User, Student, GuestSlot, Op, decrypt, decryptDeterministic } = require('./server/db-postgres');
 
 // テスト用グローバル設定
 let isFixedOtpMode = false;
@@ -263,8 +263,19 @@ app.post('/api/login', loginLimiter, async (req, res, next) => {
 // レポートエンドポイント (管理者のみ) — GuestSlot ベース
 app.get('/api/report', authenticateToken, authorizeRole(['admin']), async (req, res, next) => {
     try {
-        const slots = await GuestSlot.findAll();
-        const students = await Student.findAll();
+        const slotsRaw = await GuestSlot.findAll({ raw: true });
+        const studentsRaw = await Student.findAll({ raw: true });
+
+        const slots = slotsRaw.map(s => ({
+            ...s,
+            student_email: decryptDeterministic(s.student_email)
+        }));
+        const students = studentsRaw.map(s => ({
+            ...s,
+            email: decryptDeterministic(s.email),
+            grade_class: decrypt(s.grade_class),
+            name: decrypt(s.name)
+        }));
 
         const totalSlots = slots.length;
         const checkedInCount = slots.filter(s => s.used).length;
@@ -399,8 +410,23 @@ app.post('/api/verify', authenticateToken, async (req, res, next) => {
 // 管理者: guest_slots一覧 (reception, scannerも閲覧可)
 app.get('/api/admin/guest-slots', authenticateToken, authorizeRole(['admin', 'reception', 'scanner']), async (req, res, next) => {
     try {
-        const slots = await GuestSlot.findAll({ raw: true });
-        const students = await Student.findAll({ raw: true });
+        const slotsRaw = await GuestSlot.findAll({ raw: true });
+        const studentsRaw = await Student.findAll({ raw: true });
+
+        const slots = slotsRaw.map(s => ({
+            ...s,
+            student_name: decrypt(s.student_name),
+            guest_name: decrypt(s.guest_name),
+            student_email: decryptDeterministic(s.student_email),
+            grade_class: decrypt(s.grade_class)
+        }));
+        const students = studentsRaw.map(s => ({
+            ...s,
+            name: decrypt(s.name),
+            email: decryptDeterministic(s.email),
+            grade_class: decrypt(s.grade_class)
+        }));
+
         const classMap = {};
         students.forEach(s => { if (s.grade_class) classMap[s.email] = s.grade_class; });
         
@@ -435,22 +461,22 @@ app.post('/api/admin/guest-slots/:id/check-in', authenticateToken, authorizeRole
 // 生徒一覧（招待スロット数付き）
 app.get('/api/admin/students', authenticateToken, authorizeRole(['admin']), async (req, res, next) => {
     try {
-        const students = await Student.findAll();
-        const slots = await GuestSlot.findAll();
-        const result = students.map(s => {
-            const mySlots = slots.filter(sl => sl.student_email === s.email);
+        const studentsRaw = await Student.findAll({ raw: true });
+        const slotsRaw = await GuestSlot.findAll({ raw: true });
+        const result = studentsRaw.map(s => {
+            const mySlots = slotsRaw.filter(sl => sl.student_email === s.email);
             return {
                 id: s.id,
-                name: s.name,
-                email: s.email,
-                grade_class: s.grade_class || null,
+                name: decrypt(s.name),
+                email: decryptDeterministic(s.email),
+                grade_class: decrypt(s.grade_class) || null,
                 createdAt: s.createdAt,
                 totalSlots: mySlots.length,
                 usedSlots: mySlots.filter(sl => sl.used).length,
                 max_slots: s.max_guest_slots || null,
                 slots: mySlots.map(sl => ({
                     id: sl.id,
-                    guest_name: sl.guest_name,
+                    guest_name: decrypt(sl.guest_name),
                     used: sl.used,
                     checked_in_at: sl.checked_in_at,
                     createdAt: sl.createdAt,
@@ -484,7 +510,7 @@ app.delete('/api/admin/students/:id', authenticateToken, authorizeRole(['admin']
     try {
         const student = await Student.findOne({ where: { id: req.params.id } });
         if (!student) return res.status(404).json({ message: '生徒が見つかりません。' });
-        await GuestSlot.destroy({ where: { student_email: student.email } });
+        await GuestSlot.destroy({ where: { student_email: encryptDeterministic(student.email) } });
         await Student.destroy({ where: { id: req.params.id } });
         res.json({ message: `${student.name} のアカウントと招待スロットを削除しました。` });
     } catch (error) { next(error); }
@@ -554,13 +580,15 @@ app.post('/api/admin/guest-slots/:id/uncheck-in', authenticateToken, authorizeRo
 // システム設定取得
 app.get('/api/admin/settings', authenticateToken, authorizeRole(['admin']), async (req, res, next) => {
     try {
-        const allSlots = await GuestSlot.findAll();
+        const totalStudents = await Student.count();
+        const totalSlots = await GuestSlot.count();
+        const checkedInSlots = await GuestSlot.count({ where: { used: true } });
         res.json({
             guestSlotsPerStudent: parseInt(process.env.GUEST_SLOTS_PER_STUDENT || '3'),
-            systemName: process.env.SYSTEM_NAME || '梨花祭2025',
-            totalStudents: (await Student.findAll()).length,
-            totalSlots: allSlots.length,
-            checkedInSlots: allSlots.filter(s => s.used).length
+            systemName: process.env.SYSTEM_NAME || '梨花祭2026',
+            totalStudents,
+            totalSlots,
+            checkedInSlots
         });
     } catch (error) { next(error); }
 });
@@ -621,15 +649,22 @@ app.delete('/api/admin/accounts/:id', authenticateToken, authorizeRole(['admin']
 // CSVエクスポート（ゲストスロット全件）
 app.get('/api/admin/export/csv', authenticateToken, authorizeRole(['admin']), async (req, res, next) => {
     try {
-        const slots = await GuestSlot.findAll();
-        const students = await Student.findAll();
+        const slotsRaw = await GuestSlot.findAll({ raw: true });
+        const studentsRaw = await Student.findAll({ raw: true });
         const classMap = {};
-        students.forEach(s => { classMap[s.email] = s.grade_class || ''; });
+        studentsRaw.forEach(s => { 
+            const email = decryptDeterministic(s.email);
+            const cls = decrypt(s.grade_class);
+            classMap[email] = cls || ''; 
+        });
 
         const rows = [['ゲスト名', '招待した生徒', '学年クラス', '生徒メール', '入場済み', 'チェックイン日時', '作成日時']];
-        slots.forEach(s => {
+        slotsRaw.forEach(s => {
+            const guest_name = decrypt(s.guest_name);
+            const student_name = decrypt(s.student_name);
+            const student_email = decryptDeterministic(s.student_email);
             rows.push([
-                s.guest_name, s.student_name || '', classMap[s.student_email] || '', s.student_email || '',
+                guest_name, student_name || '', classMap[student_email] || '', student_email || '',
                 s.used ? '済み' : '未', s.checked_in_at || '', s.createdAt
             ]);
         });
@@ -640,37 +675,9 @@ app.get('/api/admin/export/csv', authenticateToken, authorizeRole(['admin']), as
     } catch (error) { next(error); }
 });
 
-// レポートデータエクスポートエンドポイント (管理者のみ)
+// レポートデータエクスポートエンドポイント (廃止)
 app.get('/api/export-report', authenticateToken, authorizeRole(['admin']), async (req, res, next) => {
-    try {
-        const reservations = await Reservation.findAll({ raw: true });
-
-        const reportPath = require('path').join(require('os').tmpdir(), 'report_data.csv');
-        const csvWriter = createCsvWriter({
-            path: reportPath,
-            header: [
-                { id: 'id', title: 'ID' },
-                { id: 'name', title: '名前' },
-                { id: 'contact', title: '連絡先' },
-                { id: 'relationship', title: '関係' },
-                { id: 'invite_code', title: '招待コード' },
-                { id: 'status', title: 'ステータス' },
-                { id: 'createdAt', title: '予約日時' },
-                { id: 'updatedAt', title: '更新日時' },
-            ]
-        });
-
-        await csvWriter.writeRecords(reservations);
-
-        res.download(reportPath, 'report_data.csv', () => {
-            if (require('fs').existsSync(reportPath)) {
-                require('fs').unlinkSync(reportPath);
-            }
-        });
-
-    } catch (error) {
-        next(error);
-    }
+    res.status(404).json({ message: 'This endpoint is deprecated.' });
 });
 
 // ===== テスト支援機能 API (管理者のみ) =====
@@ -685,16 +692,17 @@ app.post('/api/admin/test/clear', authenticateToken, authorizeRole(['admin']), a
             // 全消去
             await GuestSlot.destroy({ where: {}, truncate: true, cascade: true });
             await Student.destroy({ where: {}, truncate: true, cascade: true });
-            await Reservation.destroy({ where: {}, truncate: true, cascade: true });
-            await InviteCode.destroy({ where: {}, truncate: true, cascade: true });
             res.json({ message: 'データベースの全データを消去し、リセットしました。' });
         } else {
             // テストデータのみ削除
-            const testStudents = await Student.findAll({ where: { name: { [Op.like]: 'テスト生徒%' } } });
+            const allStudents = await Student.findAll();
+            const testStudents = allStudents.filter(s => s.name && s.name.startsWith('テスト生徒'));
             const testEmails = testStudents.map(s => s.email);
             
-            await GuestSlot.destroy({ where: { student_email: { [Op.in]: testEmails } } });
-            await Student.destroy({ where: { email: { [Op.in]: testEmails } } });
+            if (testEmails.length > 0) {
+                await GuestSlot.destroy({ where: { student_email: { [Op.in]: testEmails.map(e => encryptDeterministic(e)) } } });
+                await Student.destroy({ where: { email: { [Op.in]: testEmails.map(e => encryptDeterministic(e)) } } });
+            }
             
             res.json({ message: 'テストデータを消去しました。' });
         }
@@ -786,7 +794,7 @@ app.post('/api/student/login-otp', otpLimiter, [
             return res.status(403).json({ message: `学校配布のメールアドレス（${ALLOWED_DOMAIN}）のみ使用できます。` });
         }
 
-        const student = await Student.findOne({ where: { email: normalizedEmail } });
+        const student = await Student.findOne({ where: { email: encryptDeterministic(normalizedEmail) } });
         if (!student) {
             return res.status(404).json({ message: 'このメールアドレスで登録されたアカウントが見つかりません。初回は「新規登録」から登録してください。' });
         }
@@ -910,7 +918,7 @@ app.post('/api/student/verify-otp', loginLimiter, [
         const isTestAccount = normalizedEmail.startsWith('test_student_');
         const effectiveOtp = (isFixedOtpMode || isTestAccount) ? TEST_FIXED_OTP : null;
 
-        const student = await Student.findOne({ where: { email: normalizedEmail } });
+        const student = await Student.findOne({ where: { email: encryptDeterministic(normalizedEmail) } });
 
         // OTP検証 (テストモード中は固定値、それ以外はDBの値)
         const isValid = effectiveOtp ? (otp.trim() === effectiveOtp) : (student && student.otp === otp.trim());
@@ -928,7 +936,7 @@ app.post('/api/student/verify-otp', loginLimiter, [
         if (!effectiveOtp) {
             await Student.update(
                 { otp: null, otp_expires_at: null },
-                { where: { email: normalizedEmail } }
+                { where: { email: encryptDeterministic(normalizedEmail) } }
             );
         }
 
@@ -959,10 +967,10 @@ const authenticateStudent = (req, res, next) => {
 // ダッシュボード: 自分のスロット一覧（個人情報なし）
 app.get('/api/student/dashboard', authenticateStudent, async (req, res, next) => {
     try {
-        const student = await Student.findOne({ where: { email: req.student.email } });
+        const student = await Student.findOne({ where: { email: encryptDeterministic(req.student.email) } });
         const maxSlots = student && student.max_guest_slots !== null ? student.max_guest_slots : GUEST_SLOTS_PER_STUDENT;
 
-        const slots = await GuestSlot.findAll({ where: { student_email: req.student.email } });
+        const slots = await GuestSlot.findAll({ where: { student_email: encryptDeterministic(req.student.email) } });
         // ゲスト個人情報は返さない: token, used, guest_name のみ
         const safeSlots = slots.map(s => ({
             id: s.id,
@@ -995,7 +1003,7 @@ app.put('/api/student/message-template', authenticateStudent, [
         const { message_template } = req.body;
         await Student.update(
             { message_template },
-            { where: { email: req.student.email } }
+            { where: { email: encryptDeterministic(req.student.email) } }
         );
         res.json({ message: 'メッセージテンプレートを更新しました。' });
     } catch (error) {
@@ -1014,10 +1022,10 @@ app.post('/api/student/generate-links', authenticateStudent, [
         }
 
         // 既存スロット数と上限チェック
-        const student = await Student.findOne({ where: { email: req.student.email } });
+        const student = await Student.findOne({ where: { email: encryptDeterministic(req.student.email) } });
         const maxSlots = student && student.max_guest_slots !== null ? student.max_guest_slots : GUEST_SLOTS_PER_STUDENT;
         
-        const existingCount = await GuestSlot.count({ where: { student_email: req.student.email } });
+        const existingCount = await GuestSlot.count({ where: { student_email: encryptDeterministic(req.student.email) } });
         if (existingCount >= maxSlots) {
             return res.status(400).json({
                 message: `招待枠の上限（${maxSlots}枠）に達しています。`
@@ -1070,7 +1078,7 @@ app.put('/api/student/guest-slots/:id', authenticateStudent, async (req, res, ne
             return res.status(403).json({ message: '当日は名前の変更ができません。' });
         }
 
-        const slot = await GuestSlot.findOne({ where: { id, student_email: req.student.email } });
+        const slot = await GuestSlot.findOne({ where: { id, student_email: encryptDeterministic(req.student.email) } });
         
         if (!slot) {
             return res.status(404).json({ message: '指定された招待枠が見つかりません。' });
@@ -1249,10 +1257,13 @@ app.post('/api/admin/test/clear', authenticateToken, authorizeRole(['admin']), a
             return res.json({ message: '管理アカウント以外の全データを削除しました。' });
         } else {
             // テスト生徒のみ削除
-            const testStudents = await Student.findAll({ where: { email: { [Op.like]: 'test_student_%' } } });
+            const allStudents = await Student.findAll();
+            const testStudents = allStudents.filter(s => s.email && s.email.startsWith('test_student_'));
             const emails = testStudents.map(s => s.email);
-            await GuestSlot.destroy({ where: { student_email: emails } });
-            await Student.destroy({ where: { email: emails } });
+            if (emails.length > 0) {
+                await GuestSlot.destroy({ where: { student_email: { [Op.in]: emails.map(e => encryptDeterministic(e)) } } });
+                await Student.destroy({ where: { email: { [Op.in]: emails.map(e => encryptDeterministic(e)) } } });
+            }
             return res.json({ message: 'テストデータに関連する生徒とスロットを削除しました。' });
         }
     } catch (error) {
@@ -1263,14 +1274,23 @@ app.post('/api/admin/test/clear', authenticateToken, authorizeRole(['admin']), a
 // 配布用名簿データ取得
 app.get('/api/admin/student-distribution-data', authenticateToken, authorizeRole(['admin']), async (req, res, next) => {
     try {
-        const students = await Student.findAll({ order: [['grade_class', 'ASC'], ['name', 'ASC']] });
+        const studentsRaw = await Student.findAll({ raw: true });
         
+        const decryptedStudents = studentsRaw.map(s => ({
+            name: decrypt(s.name),
+            email: decryptDeterministic(s.email),
+            grade_class: decrypt(s.grade_class) || '未設定'
+        })).sort((a, b) => {
+            const gcComp = a.grade_class.localeCompare(b.grade_class);
+            if (gcComp !== 0) return gcComp;
+            return a.name.localeCompare(b.name);
+        });
+
         // クラスごとにグループ化
         const grouped = {};
-        students.forEach(s => {
-            const gc = s.grade_class || '未設定';
-            if (!grouped[gc]) grouped[gc] = [];
-            grouped[gc].push({
+        decryptedStudents.forEach(s => {
+            if (!grouped[s.grade_class]) grouped[s.grade_class] = [];
+            grouped[s.grade_class].push({
                 name: s.name,
                 email: s.email,
                 otp: '123456' // テスト用固定

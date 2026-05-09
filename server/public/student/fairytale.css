@@ -1,0 +1,243 @@
+@import url('https://fonts.googleapis.com/css2?family=Cinzel+Decorative:wght@400;700&family=Cormorant+Garamond:wght@400;600;700&family=Noto+Sans+JP:wght@400;700&display=swap');
+
+:root {
+    --color-gold: #c5a059; /* 落ち着いたアンティークゴールド */
+    --color-gold-glow: rgba(197, 160, 89, 0.3);
+    --color-teal: #0f766e; /* 深みのあるティール */
+    --color-teal-glow: rgba(15, 118, 110, 0.2);
+    --color-crimson: #be123c; /* 落ち着いた赤 */
+    --color-bg-dark: #111827; /* ダークグレー */
+    --color-glass-bg: rgba(17, 24, 39, 0.95); /* 不透明度を大幅にアップ */
+    --color-glass-border: rgba(197, 160, 89, 0.3);
+    --color-text-main: #f9fafb;
+    --color-text-sub: #d1d5db;
+    --radius-ornate: 16px;
+    --shadow-subtle: 0 15px 30px rgba(0,0,0,0.5);
+}
+
+* {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+}
+
+body {
+    font-family: 'Noto Sans JP', sans-serif; /* 本文は読みやすさ重視 */
+    background: radial-gradient(circle at 50% 0%, #4b5563 0%, #111827 100%) no-repeat center center fixed;
+    background-size: cover;
+    color: var(--color-text-main);
+    line-height: 1.6;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 20px;
+    overflow-x: hidden;
+}
+
+/* イラスト背景 (rikasai-main.png) の表示設定 */
+body.has-bg {
+    background: url('../assets/rikasai-main.png') no-repeat center center fixed !important;
+    background-size: cover !important;
+}
+
+/* 背景を暗くして視認性を確保するオーバーレイ */
+body::before {
+    content: '';
+    position: fixed;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background: rgba(0, 0, 0, 0.75); /* より暗く設定 */
+    pointer-events: none;
+    z-index: 0;
+}
+
+.container {
+    position: relative;
+    z-index: 10;
+    width: 100%;
+    max-width: 500px;
+    margin-top: 30px;
+}
+
+.logo-container {
+    text-align: center;
+    margin-bottom: 30px;
+}
+
+.title {
+    font-family: 'Cinzel Decorative', cursive;
+    font-size: 2.4rem;
+    font-weight: 700;
+    color: var(--color-gold);
+    text-shadow: 0 2px 4px rgba(0,0,0,0.5);
+    letter-spacing: 1px;
+}
+
+.subtitle {
+    font-family: 'Noto Sans JP', sans-serif;
+    font-size: 0.85rem;
+    letter-spacing: 4px;
+    color: var(--color-text-sub);
+    margin-top: 10px;
+    background: rgba(15, 118, 110, 0.4);
+    display: inline-block;
+    padding: 4px 20px;
+    border-radius: 50px;
+}
+
+/* カード：視認性向上のため不透明度を高く、アニメーションを停止 */
+.glass-card {
+    background: var(--color-glass-bg);
+    border: 1px solid var(--color-glass-border);
+    border-radius: var(--radius-ornate);
+    padding: 40px 25px;
+    box-shadow: var(--shadow-subtle);
+    position: relative;
+}
+
+/* Forms */
+.form-group {
+    margin-bottom: 20px;
+}
+
+.form-label {
+    display: block;
+    font-size: 0.9rem;
+    font-weight: 700;
+    margin-bottom: 8px;
+    color: var(--color-gold);
+}
+
+.form-input {
+    width: 100%;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1.5px solid rgba(197, 160, 89, 0.4);
+    border-radius: 10px;
+    padding: 12px 16px;
+    color: #fff;
+    font-size: 1rem;
+    transition: all 0.2s ease;
+}
+
+.form-input:focus {
+    outline: none;
+    border-color: var(--color-gold);
+    background: rgba(255, 255, 255, 0.1);
+}
+
+/* Buttons: 落ち着いた配色へ */
+.btn {
+    display: inline-flex;
+    justify-content: center;
+    align-items: center;
+    width: 100%;
+    padding: 14px;
+    border-radius: 50px;
+    border: 1.5px solid var(--color-gold);
+    background: transparent;
+    color: var(--color-gold);
+    font-weight: 700;
+    font-size: 0.9rem;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.btn:hover {
+    background: rgba(197, 160, 89, 0.2);
+}
+
+.btn-primary {
+    background: var(--color-gold);
+    color: #111;
+    border: none;
+}
+
+.btn-primary:hover {
+    background: #e5c07b;
+    transform: translateY(-1px);
+}
+
+/* Tabs */
+.tab-bar {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 25px;
+}
+
+.tab-btn {
+    flex: 1;
+    padding: 10px;
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(15, 118, 110, 0.4);
+    border-radius: 10px;
+    color: #94a3b8;
+    font-size: 0.75rem;
+    font-weight: 700;
+    cursor: pointer;
+}
+
+.tab-btn.active {
+    background: rgba(197, 160, 89, 0.1);
+    color: var(--color-gold);
+    border-color: var(--color-gold);
+}
+
+/* Slot Cards: 背景と文字のコントラストを強調 */
+.slot-card {
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 12px;
+    padding: 18px;
+    margin-bottom: 15px;
+}
+
+.slot-name {
+    font-size: 1.1rem;
+    font-weight: 700;
+    color: #fff;
+    margin-bottom: 4px;
+}
+
+.slot-status {
+    font-size: 0.8rem;
+    font-weight: 700;
+}
+
+.slot-status.used { color: #fb7185; }
+.slot-status.unused { color: #2dd4bf; }
+
+/* Modal */
+.modal-overlay {
+    position: fixed;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background: rgba(0, 0, 0, 0.9);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+}
+
+.modal-container {
+    background: #1f2937;
+    border: 2px solid var(--color-gold);
+    border-radius: 12px;
+    padding: 25px;
+    width: 400px;
+    max-width: 90%;
+    position: relative;
+    text-align: center;
+}
+
+/* Footer */
+footer {
+    margin-top: auto;
+    padding: 30px;
+    text-align: center;
+    color: var(--color-text-sub);
+    font-size: 0.7rem;
+    opacity: 0.6;
+}
+
+/* Animations */
+.fade-in { animation: fadeIn 0.4s ease-out; }
+@keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }

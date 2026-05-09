@@ -4,13 +4,25 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>梨花祭2025 入場QR</title>
+    <title>梨花祭2026 入場QR</title>
     <link rel="stylesheet" href="/css/style.css">
+    <link rel="manifest" href="/manifest.json">
+    <script>
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('/sw.js').then(reg => {
+                    console.log('Service Worker registered!');
+                }).catch(err => {
+                    console.log('Service Worker registration failed:', err);
+                });
+            });
+        }
+    </script>
 </head>
 
 <body class="landing-page">
     <div class="glass-card slide-up" style="text-align: center;">
-        <h1 class="title">梨花祭2025</h1>
+        <h1 class="title">梨花祭2026</h1>
 
         <!-- トークンなし -->
         <div id="state-no-token" style="display: none;">
@@ -48,7 +60,8 @@
             <p id="guest-greeting" style="font-weight: 700; font-size: 1.1rem; margin-bottom: 1rem;"></p>
             <img id="qr-image" src="" alt="入場用QRコード" style="width: 220px; height: 220px; border-radius: var(--radius-md); border: 3px solid var(--color-success);"/>
             <div style="margin-top: 1.5rem; background: var(--color-bg); border-radius: var(--radius-md); padding: 1rem;">
-                <p style="font-size: 0.85rem; color: var(--color-text-sub);">このQRコードをスクリーンショットして<br>当日の受付でご提示ください</p>
+                <p style="font-size: 0.85rem; color: var(--color-text-sub); margin-bottom: 10px;">当日は回線が混雑し、このページが開けなくなる可能性があります。<br><strong style="color: var(--color-error);">必ず事前にチケット画像を保存（またはスクリーンショット）</strong>して、当日は画像をご提示ください。</p>
+                <button class="btn btn-primary" onclick="downloadTicketImage()" style="width: 100%; padding: 12px; font-weight: bold;">📥 チケット画像を端末に保存</button>
             </div>
             <div style="margin-top: 1.5rem;">
                 <p style="font-size: var(--font-size-sm); color: var(--color-text-sub);">
@@ -103,9 +116,15 @@
                 }
 
                 // QR表示
-                document.getElementById('guest-greeting').textContent =
-                    `${data.guest_name} さんの入場券`;
+                document.getElementById('guest-greeting').textContent = `${data.guest_name} さんの入場券`;
                 document.getElementById('qr-image').src = data.qr_code;
+                
+                // グローバルにデータを保持（画像生成用）
+                window.ticketData = {
+                    guestName: data.guest_name,
+                    qrCode: data.qr_code
+                };
+
                 show('qr');
 
             } catch (e) {
@@ -113,6 +132,103 @@
                 document.getElementById('error-msg').textContent = 'サーバーとの通信に失敗しました。時間をおいて再試行してください。';
             }
         })();
+
+        // ===== チケット画像ダウンロード処理 =====
+        async function downloadTicketImage() {
+            if (!window.ticketData) return;
+            const btn = document.querySelector('button[onclick="downloadTicketImage()"]');
+            btn.textContent = '生成中...';
+            btn.disabled = true;
+
+            try {
+                const canvas = document.createElement('canvas');
+                canvas.width = 800;
+                canvas.height = 1200;
+                const ctx = canvas.getContext('2d');
+
+                // 背景グラデーション
+                const gradient = ctx.createLinearGradient(0, 0, 800, 1200);
+                gradient.addColorStop(0, '#4f46e5');
+                gradient.addColorStop(1, '#ec4899');
+                ctx.fillStyle = gradient;
+                ctx.fillRect(0, 0, 800, 1200);
+
+                // 装飾
+                ctx.fillStyle = 'rgba(255, 255, 255, 0.08)';
+                ctx.beginPath(); ctx.arc(100, 100, 300, 0, Math.PI * 2); ctx.fill();
+                ctx.beginPath(); ctx.arc(700, 1000, 400, 0, Math.PI * 2); ctx.fill();
+
+                // チケットの白背景
+                const cardWidth = 660, cardHeight = 940;
+                const cardX = (800 - cardWidth) / 2, cardY = (1200 - cardHeight) / 2;
+                ctx.fillStyle = '#ffffff';
+                ctx.shadowColor = 'rgba(0, 0, 0, 0.25)';
+                ctx.shadowBlur = 30; ctx.shadowOffsetY = 15;
+                if (ctx.roundRect) {
+                    ctx.beginPath(); ctx.roundRect(cardX, cardY, cardWidth, cardHeight, 30); ctx.fill();
+                } else {
+                    ctx.fillRect(cardX, cardY, cardWidth, cardHeight);
+                }
+                ctx.shadowColor = 'transparent';
+
+                // 切り取り線
+                ctx.strokeStyle = '#e5e7eb'; ctx.lineWidth = 4; ctx.setLineDash([15, 10]);
+                ctx.beginPath(); ctx.moveTo(cardX, cardY + 680); ctx.lineTo(cardX + cardWidth, cardY + 680); ctx.stroke();
+                ctx.setLineDash([]);
+
+                // テキスト
+                ctx.textAlign = 'center';
+                ctx.fillStyle = '#1e1b4b'; ctx.font = 'bold 54px sans-serif';
+                ctx.fillText('梨花祭 2025', 400, cardY + 110);
+                
+                ctx.fillStyle = '#6366f1'; ctx.font = 'bold 28px sans-serif';
+                ctx.fillText('SPECIAL GUEST TICKET', 400, cardY + 165);
+
+                ctx.fillStyle = '#111827'; ctx.font = 'bold 56px sans-serif';
+                const dName = window.ticketData.guestName.length > 12 ? window.ticketData.guestName.substring(0, 12) + '…' : window.ticketData.guestName;
+                ctx.fillText(dName + ' 様', 400, cardY + 300);
+
+                // QRコード画像
+                const qrImg = new Image();
+                qrImg.src = window.ticketData.qrCode;
+                await new Promise(r => qrImg.onload = r);
+                
+                const qrSize = 270;
+                const qrX = (800 - qrSize) / 2, qrY = cardY + 350;
+                ctx.strokeStyle = '#f3f4f6'; ctx.lineWidth = 2;
+                ctx.strokeRect(qrX - 10, qrY - 10, qrSize + 20, qrSize + 20);
+                ctx.drawImage(qrImg, qrX, qrY, qrSize, qrSize);
+
+                // フッターテキスト
+                ctx.fillStyle = '#4b5563'; ctx.font = 'bold 26px sans-serif';
+                ctx.fillText('当日はこのQRコードをご提示ください', 400, cardY + 740);
+                ctx.font = '24px sans-serif';
+                ctx.fillText('開催日: 2025年6月◯日（土）9:00〜14:00', 400, cardY + 810);
+                ctx.fillText('場所: 千葉英和高等学校', 400, cardY + 860);
+
+                // ダウンロード実行
+                const dataUrl = canvas.toDataURL('image/png');
+                const a = document.createElement('a');
+                a.href = dataUrl;
+                a.download = `梨花祭チケット_${window.ticketData.guestName}.png`;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+
+                btn.textContent = '保存完了！';
+                btn.style.backgroundColor = 'var(--color-success)';
+                setTimeout(() => {
+                    btn.textContent = '📥 チケット画像を端末に保存';
+                    btn.style.backgroundColor = '';
+                    btn.disabled = false;
+                }, 3000);
+            } catch (err) {
+                console.error(err);
+                alert('画像の生成に失敗しました。この画面をスクリーンショットして保存してください。');
+                btn.textContent = '📥 チケット画像を端末に保存';
+                btn.disabled = false;
+            }
+        }
     </script>
 
     <footer style="text-align: center; margin-top: 2rem; padding: 1rem;">
