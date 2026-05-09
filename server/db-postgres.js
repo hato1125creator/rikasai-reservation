@@ -13,6 +13,7 @@ const key = crypto.scryptSync(secret, 'salt', 32);
 
 function encrypt(text) {
     if (!text || typeof text !== 'string') return text;
+    if (text.includes(':') && text.split(':').length === 2 && text.split(':')[0].length === 32) return text; // Already encrypted (iv:data)
     try {
         const iv = crypto.randomBytes(16);
         const cipher = crypto.createCipheriv('aes-256-cbc', key, iv);
@@ -41,6 +42,7 @@ function decrypt(text) {
 
 function encryptDeterministic(text) {
     if (!text || typeof text !== 'string') return text;
+    if (text.startsWith('det:')) return text; // Already encrypted
     try {
         const iv = crypto.scryptSync(secret, 'deterministic_iv', 16);
         const cipher = crypto.createCipheriv('aes-256-cbc', key, iv);
